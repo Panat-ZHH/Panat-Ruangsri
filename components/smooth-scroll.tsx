@@ -14,6 +14,12 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let wasBelowTop = window.scrollY > 1;
+    const detectTop = (position: number) => {
+      if (position <= 1 && wasBelowTop) window.dispatchEvent(new Event('panat:scroll-top'));
+      wasBelowTop = position > 1;
+    };
+    const onNativeScroll = () => detectTop(window.scrollY);
     const configure = () => {
       controller.current?.destroy();
       controller.current = preference.matches ? null : new Lenis({
@@ -26,6 +32,7 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
         wheelMultiplier: 0.4,
         lerp: 0.045,
       });
+      controller.current?.on('scroll', (lenis) => detectTop(lenis.animatedScroll));
     };
     const onKeyDown = (event: KeyboardEvent) => {
       const lenis = controller.current;
@@ -48,9 +55,11 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
     configure();
     preference.addEventListener('change', configure);
     window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('scroll', onNativeScroll, { passive: true });
     return () => {
       preference.removeEventListener('change', configure);
       window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('scroll', onNativeScroll);
       controller.current?.destroy();
       controller.current = null;
     };

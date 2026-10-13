@@ -1190,6 +1190,7 @@ export default function BrandScene() {
       return true;
     };
     const onCardWheel = (event: WheelEvent) => {
+      resetModelAtTop();
       if (event.ctrlKey || event.deltaY === 0) return;
       if (event.target instanceof Element && event.target.closest('input, textarea, select, [data-lenis-prevent]')) return;
       const movement = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
@@ -1208,6 +1209,7 @@ export default function BrandScene() {
       lastScrollInput = lastScrollChange;
     };
     const onSnapPointerDown = (event: PointerEvent) => {
+      resetModelAtTop();
       pointerHeld = true;
       previousTouchY = event.clientY;
       if (event.target instanceof Element && event.target.closest('a[href^="#"]')) {
@@ -1233,6 +1235,7 @@ export default function BrandScene() {
       lastScrollInput = lastScrollChange;
     };
     const onSnapKeyDown = (event: KeyboardEvent) => {
+      resetModelAtTop();
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.target instanceof Element && event.target.closest('a, button, input, textarea, select, [contenteditable="true"]')) return;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
@@ -1247,6 +1250,7 @@ export default function BrandScene() {
       }
     };
     const onCardTouchStart = (event: TouchEvent) => {
+      resetModelAtTop();
       if (event.touches.length !== 1) return;
       touchActive = true;
       gestureTouchY = event.touches[0].clientY;
@@ -1264,9 +1268,42 @@ export default function BrandScene() {
       touchActive = false;
       gestureLastInput = performance.now();
     };
+    function resetModelAtTop() {
+      const distance = Math.max(0, -(heroContainer?.getBoundingClientRect().top ?? 0));
+      if (distance > 1) return;
+      const needsRender = modelActive || scrollProgress !== 0 || !group.quaternion.equals(initialRotation);
+      endDrag();
+      scrollProgress = 0;
+      modelActive = false;
+      inCardSection = false;
+      sceneBlendTarget = 0;
+      idleRotation = 0;
+      pendingDrag.set(0, 0);
+      cardGestureTarget = null;
+      gestureReady = true;
+      gestureDistance = 0;
+      scrollDirection = 0;
+      scrollVelocity = 0;
+      snapTarget = null;
+      snapStartTangent = 0;
+      returningToTop = false;
+      cardEntryProgress = 1.5;
+      for (const rotation of [manualRotation, cardEntryRotation, topReturnRotation, heroOffsetRotation,
+        handoffRotation, rotationStep, targetRotation, group.quaternion]) {
+        rotation.copy(initialRotation);
+      }
+      scrollRotation.set(0, 0, 0);
+      ledScreenMaterial.uniforms.uSceneActive.value = 0;
+      updateCards();
+      if (needsRender) renderWithRefraction();
+    }
     const updateModelActivation = () => {
       const scrollDistance = Math.max(0, -(heroContainer?.getBoundingClientRect().top ?? 0));
       const nextProgress = scrollDistance <= 1 ? 0 : scrollDistance / window.innerHeight;
+      if (nextProgress === 0) {
+        resetModelAtTop();
+        return;
+      }
       if (nextProgress === scrollProgress) return;
       scrollVelocity = (nextProgress - scrollProgress) * window.innerHeight
         / Math.max((performance.now() - lastScrollChange) / 1000, 0.016);
@@ -1286,26 +1323,6 @@ export default function BrandScene() {
       const nextActive = scrollProgress > 0;
       if (!nextActive && modelActive) endDrag();
       modelActive = nextActive;
-      if (!modelActive) {
-        manualRotation.copy(initialRotation);
-        pendingDrag.set(0, 0);
-        idleRotation = 0;
-        cardGestureTarget = null;
-        gestureReady = true;
-        gestureDistance = 0;
-        scrollDirection = 0;
-        returningToTop = false;
-        cardEntryProgress = 1.5;
-        cardEntryRotation.copy(initialRotation);
-        topReturnRotation.copy(initialRotation);
-        heroOffsetRotation.copy(initialRotation);
-        handoffRotation.copy(initialRotation);
-        rotationStep.copy(initialRotation);
-        scrollRotation.set(0, 0, 0);
-        targetRotation.copy(initialRotation);
-        ledScreenMaterial.uniforms.uSceneActive.value = 0;
-        group.quaternion.copy(initialRotation);
-      }
       if (reduceMotion) {
         ledScreenMaterial.uniforms.uSceneActive.value = sceneBlendTarget;
         if (!modelActive) {
@@ -1318,6 +1335,7 @@ export default function BrandScene() {
     };
     updateModelActivation();
     updateCards();
+    window.addEventListener('panat:scroll-top', resetModelAtTop);
     window.addEventListener('resize', updateModelActivation);
     window.addEventListener('resize', updateCards);
     window.addEventListener('pointerdown', onPointerDown);
@@ -1436,6 +1454,7 @@ export default function BrandScene() {
       sceneDisposed = true;
       window.cancelAnimationFrame(frameId);
       endDrag();
+      window.removeEventListener('panat:scroll-top', resetModelAtTop);
       window.removeEventListener('resize', updateModelActivation);
       window.removeEventListener('resize', updateCards);
       window.removeEventListener('pointerdown', onPointerDown);
