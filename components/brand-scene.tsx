@@ -211,7 +211,7 @@ function createCardTitleTexture() {
     context.font = '700 112px "Avenir Next", sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    ['SOFTWARE DEVELOPER', 'FOUNDER', 'SIDE JOBS', 'MORE'].forEach((title, index) => {
+    ['SOFTWARE DEVELOPER', 'FOUNDER', 'SIDE JOBS', 'HOBBYS'].forEach((title, index) => {
       context.fillText(title, canvas.width / 2, index * 192 + 96, canvas.width * 0.92);
     });
   }
@@ -444,6 +444,128 @@ export default function BrandScene() {
     });
     refractionTarget.texture.generateMipmaps = false;
     const refractionResolution = new THREE.Vector2(1, 1);
+    const floatTargets = renderer.extensions.has('EXT_color_buffer_float');
+    const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
+      type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
+      samples: 4,
+      depthBuffer: true,
+    });
+    const waveTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(1, 1, {
+      type: THREE.HalfFloatType,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      depthBuffer: false,
+    }));
+    const waveTexel = new THREE.Vector2(1, 1);
+    const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const postScene = new THREE.Scene();
+    const postVertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `;
+    const waveMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uState: { value: null },
+        uTexel: { value: waveTexel },
+        uAspect: { value: 1 },
+        uFrom: { value: new THREE.Vector2() },
+        uTo: { value: new THREE.Vector2() },
+        uForce: { value: 0 },
+      },
+      vertexShader: postVertexShader,
+      fragmentShader: `
+        uniform sampler2D uState;
+        uniform vec2 uTexel;
+        uniform float uAspect;
+        uniform vec2 uFrom;
+        uniform vec2 uTo;
+        uniform float uForce;
+        varying vec2 vUv;
+        void main() {
+          vec4 state = texture2D(uState, vUv);
+          float average = (
+            texture2D(uState, vUv - vec2(uTexel.x, 0.0)).r +
+            texture2D(uState, vUv + vec2(uTexel.x, 0.0)).r +
+            texture2D(uState, vUv - vec2(0.0, uTexel.y)).r +
+            texture2D(uState, vUv + vec2(0.0, uTexel.y)).r
+          ) * 0.25;
+          state.g += (average - state.r) * 2.0;
+          state.g *= 0.93;
+          state.r += state.g;
+          state.r *= 0.94;
+          vec2 point = vUv * vec2(uAspect, 1.0);
+          vec2 start = uFrom * vec2(uAspect, 1.0);
+          vec2 segment = uTo * vec2(uAspect, 1.0) - start;
+          float along = clamp(dot(point - start, segment) / max(dot(segment, segment), 1e-6), 0.0, 1.0);
+          float drop = max(0.0, 1.0 - length(point - start - segment * along) / 0.035);
+          state.r -= (0.5 - cos(drop * 3.14159265) * 0.5) * uForce;
+          gl_FragColor = state;
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const compositeMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uScene: { value: sceneTarget.texture },
+        uWave: { value: waveTargets[0].texture },
+        uTexel: { value: waveTexel },
+        uStrength: { value: floatTargets ? 0.9 : 0 },
+      },
+      vertexShader: postVertexShader,
+      fragmentShader: `
+        uniform sampler2D uScene;
+        uniform sampler2D uWave;
+        uniform vec2 uTexel;
+        uniform float uStrength;
+        varying vec2 vUv;
+        void main() {
+          vec2 slope = vec2(
+            texture2D(uWave, vUv + vec2(uTexel.x, 0.0)).r - texture2D(uWave, vUv - vec2(uTexel.x, 0.0)).r,
+            texture2D(uWave, vUv + vec2(0.0, uTexel.y)).r - texture2D(uWave, vUv - vec2(0.0, uTexel.y)).r
+          ) * uStrength;
+          vec4 color = texture2D(uScene, clamp(vUv - slope, vec2(0.001), vec2(0.999)));
+          color.rgb *= 1.0 + (slope.y - slope.x) * 3.0;
+          gl_FragColor = color;
+          #include <colorspace_fragment>
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), compositeMaterial);
+    postQuad.frustumCulled = false;
+    postScene.add(postQuad);
+    const cardScene = new THREE.Scene();
+    const clearWaves = () => waveTargets.forEach((target) => {
+      renderer.setRenderTarget(target);
+      renderer.clear(true, false, false);
+    });
+    let waveIndex = 0;
+    let waveAccumulator = 0;
+    let waveForce = 0;
+    let wavePointerActive = false;
+    const stepWaves = (delta: number) => {
+      if (!floatTargets) return;
+      waveAccumulator = Math.min(waveAccumulator + delta, 0.05);
+      postQuad.material = waveMaterial;
+      while (waveAccumulator >= 1 / 60) {
+        waveAccumulator -= 1 / 60;
+        waveMaterial.uniforms.uState.value = waveTargets[waveIndex].texture;
+        waveMaterial.uniforms.uForce.value = waveForce;
+        waveIndex = 1 - waveIndex;
+        renderer.setRenderTarget(waveTargets[waveIndex]);
+        renderer.render(postScene, postCamera);
+        waveForce = 0;
+        waveMaterial.uniforms.uFrom.value.copy(waveMaterial.uniforms.uTo.value);
+      }
+      postQuad.material = compositeMaterial;
+      compositeMaterial.uniforms.uWave.value = waveTargets[waveIndex].texture;
+    };
 
     const roomGrid = new THREE.LineSegments(
       createRoomGrid(),
@@ -542,6 +664,15 @@ export default function BrandScene() {
         uniform sampler2D prBackgroundMap;
         uniform vec2 prRenderSize;
         uniform mat4 prProjectionMatrix;
+        vec3 prAcesToneMapping(vec3 color) {
+          const mat3 inputMatrix = mat3(
+            vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+          const mat3 outputMatrix = mat3(
+            vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+          color = inputMatrix * (color * 1.15 / 0.6);
+          color = (color * (color + 0.0245786) - 0.000090537) / (color * (0.983729 * color + 0.4329510) + 0.238081);
+          return clamp(outputMatrix * color, 0.0, 1.0);
+        }
         float prRoundBox(vec2 point, vec2 halfSize, float radius) {
           vec2 q = abs(point) - halfSize + radius;
           return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
@@ -603,8 +734,13 @@ export default function BrandScene() {
           clearcoatSpecularIndirect *= prReflectionStrength;
         #endif`,
       );
+      // The scene is rendered into an offscreen target, where three.js skips tone mapping.
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <tonemapping_fragment>',
+        'gl_FragColor.rgb = prAcesToneMapping(gl_FragColor.rgb);',
+      );
     };
-    glassMaterial.customProgramCacheKey = () => 'panat-pr-clear-screen-space-refraction-v2';
+    glassMaterial.customProgramCacheKey = () => 'panat-pr-clear-screen-space-refraction-v3';
 
     const monogram = new THREE.Group();
     monogram.scale.setScalar(0.78);
@@ -913,21 +1049,26 @@ export default function BrandScene() {
       return card;
     });
     cardGroup.visible = false;
-    scene.add(cardGroup);
+    cardScene.add(cardGroup);
 
     const renderWithRefraction = () => {
       updateLedLighting();
       group.visible = false;
-      const cardsVisible = cardGroup.visible;
-      cardGroup.visible = false;
       renderer.setRenderTarget(refractionTarget);
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
       group.visible = true;
-      cardGroup.visible = cardsVisible;
-      renderer.setRenderTarget(null);
+      renderer.setRenderTarget(sceneTarget);
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+      renderer.clear(true, true, true);
+      renderer.render(postScene, postCamera);
+      if (cardGroup.visible) {
+        renderer.autoClear = false;
+        renderer.render(cardScene, camera);
+        renderer.autoClear = true;
+      }
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -942,6 +1083,12 @@ export default function BrandScene() {
       renderer.setSize(width, height, false);
       renderer.getDrawingBufferSize(refractionResolution);
       refractionTarget.setSize(refractionResolution.x, refractionResolution.y);
+      sceneTarget.setSize(refractionResolution.x, refractionResolution.y);
+      const waveHeight = Math.max(1, Math.round(200 * height / width));
+      waveTargets.forEach((target) => target.setSize(200, waveHeight));
+      waveTexel.set(1 / 200, 1 / waveHeight);
+      waveMaterial.uniforms.uAspect.value = width / height;
+      clearWaves();
       updateCards();
       renderWithRefraction();
     });
@@ -982,7 +1129,8 @@ export default function BrandScene() {
     };
     const setHeroRotation = (progress: number) => {
       const handoff = THREE.MathUtils.clamp((progress - 1.1) / 0.4, 0, 1);
-      const pitchProgress = Math.min(progress, 1.1) + 0.4 * (handoff - handoff ** 3 + handoff ** 4 * 0.5);
+      const pitchProgress = THREE.MathUtils.lerp(Math.min(progress, 1.1) + 0.4 * (handoff - handoff ** 3 + handoff ** 4 * 0.5),
+        0.3, THREE.MathUtils.smoothstep(progress, 5.9, 6.5));
       scrollRotation.set(-pitchProgress * 0.8 + idleRotation * 0.35, -progress * 1.4 + idleRotation, 0);
       targetRotation.setFromEuler(scrollRotation).multiply(manualRotation);
     };
@@ -1001,6 +1149,8 @@ export default function BrandScene() {
       if (!inCardSection) {
         setHeroRotation(scrollProgress);
         targetRotation.multiply(heroOffsetRotation);
+        // Turn the monogram towards the camera while it grows into the screen.
+        if (outroGrow > 0) targetRotation.slerp(initialRotation, THREE.MathUtils.smoothstep(outroGrow, 0, 0.7));
       } else {
         targetRotation.copy(cardEntryRotation);
         scrollRotation.set(0, -(scrollProgress - cardEntryProgress) * 1.4, 0);
@@ -1052,17 +1202,23 @@ export default function BrandScene() {
     };
     const heroContainer = host.closest('.home');
     const transitionEnd = 0.2;
-    const cardStops = [1.5, 2.2, 3.2, 4.2, 5.2];
+    const cardStops = [1.5, 2.2, 3.2, 4.2, 5.2, 6.2, 7.8];
+    const outroGrowStart = 6.6;
+    const outroGrowEnd = 7.6;
+    const heroElement = host.closest<HTMLElement>('.hero');
+    let outroGrow = 0;
     const snapRanges = [[0, transitionEnd], ...cardStops.slice(0, -1).map((start, index) => [start, cardStops[index + 1]])];
-    const cardActions = Array.from(host.closest('.hero')?.querySelectorAll<HTMLAnchorElement>('.hero-card-action') ?? []);
+    const cardActions = Array.from(host.closest('.hero')?.querySelectorAll<HTMLElement>('.hero-card-action') ?? []);
     const actionPosition = new THREE.Vector3();
     const updateCards = () => {
       const firstEntry = THREE.MathUtils.smoothstep(scrollProgress, 1.5, 2.2);
+      const exit = THREE.MathUtils.smoothstep(scrollProgress, 5.2, 6.2);
       const cardPhase = THREE.MathUtils.smoothstep(scrollProgress, 2.2, 3.2)
         + THREE.MathUtils.smoothstep(scrollProgress, 3.2, 4.2)
-        + THREE.MathUtils.smoothstep(scrollProgress, 4.2, 5.2);
-      ledScreenMaterial.uniforms.uCardReflectionBlend.value = firstEntry;
-      ledScreenMaterial.uniforms.uCardReflectionPhase.value = cardPhase + firstEntry - 1;
+        + THREE.MathUtils.smoothstep(scrollProgress, 4.2, 5.2)
+        + exit * 1.4;
+      ledScreenMaterial.uniforms.uCardReflectionBlend.value = firstEntry * (1 - THREE.MathUtils.smoothstep(scrollProgress, 5.5, 6.2));
+      ledScreenMaterial.uniforms.uCardReflectionPhase.value = Math.min(cardPhase, 3) + firstEntry - 1;
       const fieldOfView = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const prFrontLimit = prRadius * monogram.scale.x + 0.12;
       const frontDepth = prFrontLimit + 0.65;
@@ -1072,7 +1228,7 @@ export default function BrandScene() {
       const scale = cardWidth / 4;
       const radius = Math.max(visibleWidth * 0.58, cardWidth * 0.9);
       const spacing = window.innerWidth < 600 ? 1.6 : Math.min(1.5, (cardWidth * 1.5) / radius);
-      cardGroup.visible = scrollProgress > 1.5;
+      cardGroup.visible = scrollProgress > 1.5 && exit < 1;
       let visibleCardFound = false;
       cards.forEach((card, index) => {
         const angle = 1.5 * (1 - firstEntry) + spacing * (index - cardPhase);
@@ -1111,7 +1267,7 @@ export default function BrandScene() {
           const horizontal = (actionPosition.x * 0.5 + 0.5) * host.clientWidth;
           const vertical = (-actionPosition.y * 0.5 + 0.5) * host.clientHeight;
           action.hidden = !cardGroup.visible || !card.visible || actionPosition.z < -1 || actionPosition.z > 1
-            || horizontal < 70 || horizontal > host.clientWidth - 70 || vertical < 0 || vertical > host.clientHeight - 46;
+            || horizontal < 80 || horizontal > host.clientWidth - 80 || vertical < 0 || vertical > host.clientHeight - 50;
           action.style.left = `${horizontal}px`;
           action.style.top = `${vertical}px`;
         }
@@ -1143,9 +1299,14 @@ export default function BrandScene() {
     let gestureDirection = 0;
     let gestureDistance = 0;
     let gestureReady = true;
+    let gestureMagnitude = 0;
+    let queuedDirection = 0;
+    let stepStartedAt = -Infinity;
+    let touchFresh = false;
     let touchActive = false;
     let gestureTouchY = 0;
     let pointerHeld = false;
+    let stepDuration = 650;
     const scrollImmediately = (top: number) => {
       if (smoothScroll?.current) smoothScroll.current.scrollTo(top, { immediate: true });
       else window.scrollTo({ top, behavior: 'instant' });
@@ -1159,37 +1320,53 @@ export default function BrandScene() {
       scrollImmediately(window.scrollY);
       snapTarget = containerTop + destination * window.innerHeight;
       cardGestureTarget = destination;
+      stepDuration = Math.max(destination, current) > 6.25 ? 1500 : 650;
       snapStartPosition = window.scrollY;
       snapStartTangent = 0;
       snapStartedAt = time;
+      stepStartedAt = time;
       gestureReady = false;
       return true;
     };
-    const consumeCardGesture = (movement: number, time: number) => {
+    const consumeCardGesture = (movement: number, time: number, source: 'wheel' | 'touch' | 'key' = 'wheel') => {
       const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
       const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
       if (cardGestureTarget === null && current < 1.45
         && (movement <= 0 || current + movement * 0.4 / window.innerHeight < cardStops[0])) return false;
+      if (cardGestureTarget === null && current > cardStops[cardStops.length - 1] + 0.05) return false;
       const direction = Math.sign(movement);
       if (direction === 0) return true;
-      if (snapTarget === null && time - gestureLastInput > 220) {
-        cardGestureTarget = null;
-        gestureReady = true;
-        gestureDistance = 0;
-        gestureDirection = direction;
-      }
+      const magnitude = Math.abs(movement);
+      // Trackpad inertia decays steadily; a new swipe shows up as a gap, reversal or sudden acceleration.
+      const newImpulse = source === 'key'
+        || (source === 'touch' ? touchFresh : time - gestureLastInput > 140 || magnitude > gestureMagnitude * 1.6 + 4)
+        || direction !== gestureDirection;
+      gestureMagnitude = magnitude;
       gestureLastInput = time;
       lastScrollInput = time;
-      if (!gestureReady || snapTarget !== null) return true;
+      if (snapTarget !== null) {
+        if (newImpulse && time - stepStartedAt > 180) {
+          queuedDirection = direction;
+          touchFresh = false;
+        }
+        return true;
+      }
+      if (!gestureReady && newImpulse) {
+        gestureReady = true;
+        gestureDistance = 0;
+      }
+      if (!gestureReady) return true;
       if (gestureDirection !== direction) gestureDistance = 0;
       gestureDirection = direction;
-      gestureDistance += Math.abs(movement);
-      if (gestureDistance >= 35) {
+      gestureDistance += magnitude;
+      if (gestureDistance >= 18) {
+        touchFresh = false;
         if (!startCardStep(direction, time)) return false;
       }
       return true;
     };
     const onCardWheel = (event: WheelEvent) => {
+      if (document.documentElement.classList.contains('details-open')) return;
       resetModelAtTop();
       if (event.ctrlKey || event.deltaY === 0) return;
       if (event.target instanceof Element && event.target.closest('input, textarea, select, [data-lenis-prevent]')) return;
@@ -1235,12 +1412,13 @@ export default function BrandScene() {
       lastScrollInput = lastScrollChange;
     };
     const onSnapKeyDown = (event: KeyboardEvent) => {
+      if (document.documentElement.classList.contains('details-open')) return;
       resetModelAtTop();
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.target instanceof Element && event.target.closest('a, button, input, textarea, select, [contenteditable="true"]')) return;
       if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
         scrollDirection = ['ArrowUp', 'PageUp', 'Home'].includes(event.key) || (event.key === ' ' && event.shiftKey) ? -1 : 1;
-        if (event.key !== 'Home' && event.key !== 'End' && consumeCardGesture(scrollDirection * 40, performance.now())) {
+        if (event.key !== 'Home' && event.key !== 'End' && consumeCardGesture(scrollDirection * 40, performance.now(), 'key')) {
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -1253,13 +1431,14 @@ export default function BrandScene() {
       resetModelAtTop();
       if (event.touches.length !== 1) return;
       touchActive = true;
+      touchFresh = true;
       gestureTouchY = event.touches[0].clientY;
     };
     const onCardTouchMove = (event: TouchEvent) => {
-      if (event.touches.length !== 1) return;
+      if (event.touches.length !== 1 || document.documentElement.classList.contains('details-open')) return;
       const movement = gestureTouchY - event.touches[0].clientY;
       gestureTouchY = event.touches[0].clientY;
-      if (consumeCardGesture(movement, performance.now())) {
+      if (consumeCardGesture(movement, performance.now(), 'touch')) {
         if (event.cancelable) event.preventDefault();
         event.stopImmediatePropagation();
       }
@@ -1282,6 +1461,7 @@ export default function BrandScene() {
       cardGestureTarget = null;
       gestureReady = true;
       gestureDistance = 0;
+      queuedDirection = 0;
       scrollDirection = 0;
       scrollVelocity = 0;
       snapTarget = null;
@@ -1293,6 +1473,9 @@ export default function BrandScene() {
         rotation.copy(initialRotation);
       }
       scrollRotation.set(0, 0, 0);
+      outroGrow = 0;
+      group.scale.setScalar(1);
+      heroElement?.style.setProperty('--outro-white', '0');
       ledScreenMaterial.uniforms.uSceneActive.value = 0;
       updateCards();
       if (needsRender) renderWithRefraction();
@@ -1319,6 +1502,9 @@ export default function BrandScene() {
       }
       scrollProgress = nextProgress;
       updateCards();
+      outroGrow = THREE.MathUtils.smoothstep(scrollProgress, outroGrowStart, outroGrowEnd);
+      group.scale.setScalar(1 + outroGrow ** 3 * 14);
+      heroElement?.style.setProperty('--outro-white', THREE.MathUtils.smoothstep(scrollProgress, 7.25, 7.7).toFixed(3));
       sceneBlendTarget = THREE.MathUtils.smoothstep(scrollProgress, 0, transitionEnd);
       const nextActive = scrollProgress > 0;
       if (!nextActive && modelActive) endDrag();
@@ -1359,6 +1545,29 @@ export default function BrandScene() {
     let frameId = 0;
     let visible = true;
     let previousTime = 0;
+    const parallaxTarget = new THREE.Vector2();
+    const parallax = new THREE.Vector2();
+    const onParallaxMove = (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') return;
+      parallaxTarget.set(event.clientX / window.innerWidth * 2 - 1, event.clientY / window.innerHeight * 2 - 1);
+      const bounds = host.getBoundingClientRect();
+      const pointer = new THREE.Vector2((event.clientX - bounds.left) / bounds.width, 1 - (event.clientY - bounds.top) / bounds.height);
+      const waveTo = waveMaterial.uniforms.uTo.value as THREE.Vector2;
+      if (wavePointerActive) {
+        const travel = Math.hypot((pointer.x - waveTo.x) * bounds.width / bounds.height, pointer.y - waveTo.y);
+        waveForce = Math.min(waveForce + travel * 1.2, 0.06);
+      } else {
+        (waveMaterial.uniforms.uFrom.value as THREE.Vector2).copy(pointer);
+        wavePointerActive = true;
+      }
+      waveTo.copy(pointer);
+    };
+    const onParallaxLeave = () => {
+      parallaxTarget.set(0, 0);
+      wavePointerActive = false;
+    };
+    window.addEventListener('pointermove', onParallaxMove, { passive: true });
+    document.documentElement.addEventListener('mouseleave', onParallaxLeave);
     const effectStartedAt = performance.now();
     const renderFrame = (time: number) => {
       if (!visible || document.hidden) return;
@@ -1370,7 +1579,12 @@ export default function BrandScene() {
       const intendedProgress = smoothScroll?.current?.isScrolling === 'smooth'
         ? (smoothScroll.current.targetScroll - containerTop) / window.innerHeight : scrollProgress;
       if (snapTarget !== null && Math.abs(window.scrollY - snapTarget) <= 1) snapTarget = null;
-      if (cardGestureTarget !== null && snapTarget === null && !touchActive && time - gestureLastInput > 220) {
+      if (snapTarget === null && queuedDirection !== 0 && cardGestureTarget !== null) {
+        const direction = queuedDirection;
+        queuedDirection = 0;
+        startCardStep(direction, time);
+      }
+      if (cardGestureTarget !== null && snapTarget === null && !touchActive && time - gestureLastInput > 160) {
         cardGestureTarget = null;
         gestureReady = true;
         gestureDistance = 0;
@@ -1398,12 +1612,17 @@ export default function BrandScene() {
         }
       }
       if (snapTarget !== null) {
-        const progress = reduceMotion ? 1 : THREE.MathUtils.clamp((time - snapStartedAt) / (cardGestureTarget !== null ? 650 : 360), 0, 1);
+        const progress = reduceMotion ? 1 : THREE.MathUtils.clamp((time - snapStartedAt) / (cardGestureTarget !== null ? stepDuration : 360), 0, 1);
         const eased = progress * progress * (3 - 2 * progress);
         const carry = snapStartTangent * progress * (1 - progress) ** 2;
         scrollImmediately(THREE.MathUtils.lerp(snapStartPosition, snapTarget, eased) + carry);
         updateModelActivation();
         if (progress === 1) snapTarget = null;
+      }
+      if (snapTarget === null && queuedDirection !== 0) {
+        const direction = queuedDirection;
+        queuedDirection = 0;
+        if (cardGestureTarget !== null) startCardStep(direction, time);
       }
       const delta = Math.min((time - previousTime) / 1000, 0.05);
       previousTime = time;
@@ -1419,10 +1638,16 @@ export default function BrandScene() {
         const sceneBlend = ledScreenMaterial.uniforms.uSceneActive;
         sceneBlend.value = THREE.MathUtils.lerp(sceneBlend.value, sceneBlendTarget, smoothing);
         if (Math.abs(sceneBlend.value - sceneBlendTarget) < 0.0001) sceneBlend.value = sceneBlendTarget;
+        // Rotating the enclosing room shifts it like a distant backdrop; nearer layers translate less.
+        parallax.lerp(parallaxTarget, 1 - Math.exp(-delta * 3));
+        ledScreen.rotation.set(parallax.y * 0.019, parallax.x * 0.019, 0);
+        roomGrid.rotation.copy(ledScreen.rotation);
+        panatWordmark.position.set(-parallax.x * 0.07, parallax.y * 0.048, -1.3);
+        group.position.set(-parallax.x * 0.028, parallax.y * 0.019, 0);
         if (modelActive) {
           if (!inCardSection && !returningToTop) {
             idleRotation -= delta * 0.32 * THREE.MathUtils.smoothstep(scrollProgress, 0, transitionEnd)
-              * Math.max(0.2, 1 - THREE.MathUtils.smoothstep(scrollProgress, 1.1, 1.5));
+              * (scrollProgress > 6 ? 1 - outroGrow : Math.max(0.2, 1 - THREE.MathUtils.smoothstep(scrollProgress, 1.1, 1.5)));
           }
           applyDrag(delta * 0.35);
         } else {
@@ -1430,6 +1655,7 @@ export default function BrandScene() {
           idleRotation *= 1 - smoothing;
         }
         updateModelRotation(smoothing);
+        stepWaves(delta);
       }
       if (!reduceMotion) renderWithRefraction();
       frameId = window.requestAnimationFrame(renderFrame);
@@ -1459,6 +1685,8 @@ export default function BrandScene() {
       window.removeEventListener('resize', updateCards);
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointermove', onParallaxMove);
+      document.documentElement.removeEventListener('mouseleave', onParallaxLeave);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       window.removeEventListener('blur', endDrag);
@@ -1477,13 +1705,18 @@ export default function BrandScene() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       observer.disconnect();
       resizeObserver.disconnect();
-      scene.traverse((object) => {
+      [scene, cardScene].forEach((root) => root.traverse((object) => {
         if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
           object.geometry.dispose();
           const materials = Array.isArray(object.material) ? object.material : [object.material];
           materials.forEach((material) => material.dispose());
         }
-      });
+      }));
+      postQuad.geometry.dispose();
+      waveMaterial.dispose();
+      compositeMaterial.dispose();
+      sceneTarget.dispose();
+      waveTargets.forEach((target) => target.dispose());
       renderer.dispose();
       ledTextTexture.dispose();
       ledIntroTexture.dispose();
