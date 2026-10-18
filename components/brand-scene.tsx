@@ -410,18 +410,33 @@ export default function BrandScene() {
   const smoothScroll = useSmoothScroll();
   const hostRef = useRef<HTMLDivElement>(null);
   const [webglUnavailable, setWebglUnavailable] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
+  const sceneReadyRef = useRef(false);
+  const loaderTimerRef = useRef(0);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     const compactViewport = window.matchMedia('(max-width: 760px)').matches;
+    const loaderSafetyTimeout = window.setTimeout(() => {
+      sceneReadyRef.current = true;
+      setSceneReady(true);
+    }, 5000);
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
     } catch {
-      const fallbackFrame = window.requestAnimationFrame(() => setWebglUnavailable(true));
-      return () => window.cancelAnimationFrame(fallbackFrame);
+      const fallbackFrame = window.requestAnimationFrame(() => {
+        sceneReadyRef.current = true;
+        window.clearTimeout(loaderSafetyTimeout);
+        setWebglUnavailable(true);
+        setSceneReady(true);
+      });
+      return () => {
+        window.cancelAnimationFrame(fallbackFrame);
+        window.clearTimeout(loaderSafetyTimeout);
+      };
     }
 
     const scene = new THREE.Scene();
@@ -1669,11 +1684,17 @@ export default function BrandScene() {
       }
       // Past this point the quote page fully covers the scene, so skip the expensive full-screen glass render.
       if (!reduceMotion && scrollProgress < 7.72) renderWithRefraction();
+      if (!sceneReadyRef.current) {
+        sceneReadyRef.current = true;
+        window.clearTimeout(loaderTimerRef.current);
+        loaderTimerRef.current = window.setTimeout(() => setSceneReady(true), 500);
+      }
       frameId = window.requestAnimationFrame(renderFrame);
     };
     const observer = new IntersectionObserver(([entry]) => {
       visible = entry.isIntersecting;
       window.cancelAnimationFrame(frameId);
+      if (!visible) window.clearTimeout(loaderTimerRef.current);
       if (visible) {
         if (reduceMotion) renderWithRefraction();
         frameId = window.requestAnimationFrame(renderFrame);
@@ -1690,6 +1711,8 @@ export default function BrandScene() {
     return () => {
       sceneDisposed = true;
       window.cancelAnimationFrame(frameId);
+      window.clearTimeout(loaderTimerRef.current);
+      window.clearTimeout(loaderSafetyTimeout);
       endDrag();
       window.removeEventListener('panat:scroll-top', resetModelAtTop);
       window.removeEventListener('resize', updateModelActivation);
@@ -1741,5 +1764,19 @@ export default function BrandScene() {
     };
   }, [smoothScroll]);
 
-  return <div ref={hostRef} className="brand-scene" aria-hidden="true">{webglUnavailable && <span className="brand-scene__fallback">PR</span>}</div>;
+  return (
+    <div ref={hostRef} className="brand-scene" data-ready={sceneReady} aria-hidden="true">
+      <div className="brand-loader" data-ready={sceneReady}>
+        <svg className="brand-loader__mark" viewBox="-2.25 -1.5 4.5 3" fill="none" role="presentation">
+          <g transform="scale(1 -1)">
+            <path className="brand-loader__outline" fillRule="evenodd" d="M-1.92-1.2H-1.37V-0.2H-1.07C-0.3-0.2-0.3 1.2-1.07 1.2H-1.92V-1.2ZM-1.37 0.25V0.75H-1.08C-0.69 0.75-0.69 0.25-1.08 0.25H-1.37Z" />
+            <path className="brand-loader__outline" fillRule="evenodd" d="M-0.08-1.2H0.37V-0.22H0.54L1.14-1.2H1.7L1.04-0.08C1.54 0.22 1.52 1.2 0.8 1.2H-0.08V-1.2ZM0.46 0.25V0.75H0.76C1.15 0.75 1.15 0.25 0.76 0.25H0.46Z" />
+            <path className="brand-loader__trace" d="M-1.92-1.2H-1.37V-0.2H-1.07C-0.3-0.2-0.3 1.2-1.07 1.2H-1.92V-1.2ZM-1.37 0.25V0.75H-1.08C-0.69 0.75-0.69 0.25-1.08 0.25H-1.37Z" />
+            <path className="brand-loader__trace" d="M-0.08-1.2H0.37V-0.22H0.54L1.14-1.2H1.7L1.04-0.08C1.54 0.22 1.52 1.2 0.8 1.2H-0.08V-1.2ZM0.46 0.25V0.75H0.76C1.15 0.75 1.15 0.25 0.76 0.25H0.46Z" />
+          </g>
+        </svg>
+      </div>
+      {webglUnavailable && <span className="brand-scene__fallback">PR</span>}
+    </div>
+  );
 }
