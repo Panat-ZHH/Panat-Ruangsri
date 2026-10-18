@@ -2,6 +2,15 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  async redirects() {
+    return [
+      { source: '/software-developer', destination: '/panat/software-developer', permanent: true },
+      { source: '/founder', destination: '/panat/founder', permanent: true },
+      { source: '/side-jobs', destination: '/panat/side-jobs', permanent: true },
+      { source: '/hobbys', destination: '/panat/hobbys', permanent: true },
+      { source: '/legal/:document', destination: '/panat/legal/:document', permanent: true },
+    ];
+  },
   async headers() {
     return [{
       source: '/:path*',

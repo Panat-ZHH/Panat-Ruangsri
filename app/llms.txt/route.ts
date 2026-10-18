@@ -1,19 +1,16 @@
 export function GET() {
-  const text = `# Panat Ruangsri
+  const text = `# Ruangsri
 
-> Personal portfolio of Panat Ruangsri, a software developer apprentice at Swisscom and Co-Founder and CEO of Wendico KLG in Switzerland.
+> Profiles of Pawat Ruangsri, Panat Ruangsri, and Phanuphon Ruangsri.
 
-## Portfolio
-- [Software Developer](https://panat.ruangsri.ch/software-developer): Swisscom apprenticeship in application development, August 2023 to expected summer 2027; team placements and technical experience.
-- [Founder and CEO](https://panat.ruangsri.ch/founder): Wendico KLG, digital studio, business development, client projects and leadership of a five-person team.
-- [Side Jobs](https://panat.ruangsri.ch/side-jobs): Work at the family restaurant Reb-Thai in Andelfingen, Switzerland.
-- [Hobbies](https://panat.ruangsri.ch/hobbys): Tennis, speedcubing, Rubik's Cube tutorial videos on TikTok and gym.
+## Profiles
+- [Panat Ruangsri](https://ruangsri.ch/panat): software developer apprentice at Swisscom and Co-Founder and CEO of Wendico KLG.
 
 ## Contact
-- Email: panat@ruangsri.ch
-- Canonical website: https://panat.ruangsri.ch
+- Panat Ruangsri: panat@ruangsri.ch
+- Website: https://ruangsri.ch
 
-This is a personal portfolio, not an official Swisscom website. Consult the linked pages for current details. This file does not grant rights to reuse photographs, logos or other protected content.
+Only Panat's profile is currently available on this website. This file does not grant rights to reuse photographs, logos or other protected content.
 `;
   return new Response(text, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 }

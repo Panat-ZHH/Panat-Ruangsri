@@ -3,6 +3,6 @@ import type { MetadataRoute } from 'next';
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: { userAgent: '*', allow: '/' },
-    sitemap: 'https://panat.ruangsri.ch/sitemap.xml', host: 'https://panat.ruangsri.ch',
+    sitemap: 'https://ruangsri.ch/sitemap.xml', host: 'https://ruangsri.ch',
   };
 }

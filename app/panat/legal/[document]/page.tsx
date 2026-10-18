@@ -5,7 +5,7 @@ import { PrivacySettingsButton } from '@/components/privacy-preferences';
 
 const documents = {
   impressum: { title: 'Impressum', description: 'Angaben zum Betreiber und Kontakt für das persönliche Portfolio von Panat Ruangsri.' },
-  privacy: { title: 'Datenschutzerklärung', description: 'Informationen zur Bearbeitung von Personendaten auf panat.ruangsri.ch.' },
+  privacy: { title: 'Datenschutzerklärung', description: 'Informationen zur Bearbeitung von Personendaten auf ruangsri.ch/panat.' },
   cookies: { title: 'Cookies & lokale Speicherung', description: 'Informationen zu Cookies, lokalen Einstellungen und externen Website-Inhalten.' },
 };
 
@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ document:
   const entry = documents[document as keyof typeof documents];
   return entry ? {
     title: entry.title, description: entry.description,
-    alternates: { canonical: `/legal/${document}` }, robots: { index: false, follow: true },
+    alternates: { canonical: `/panat/legal/${document}` }, robots: { index: false, follow: true },
   } : {};
 }
 
@@ -29,7 +29,7 @@ export default async function LegalPage({ params }: { params: Promise<{ document
   return (
     <main id="main-content" className="legal-page">
       <article>
-        <Link href="/" className="portfolio-back">Zur Startseite</Link>
+        <Link href="/panat" className="portfolio-back">Zur Panat-Seite</Link>
         <h1>{entry.title}</h1>
         <p className="legal-date">Stand: 16. Oktober 2026</p>
         {document === 'impressum' ? <>
@@ -37,7 +37,7 @@ export default async function LegalPage({ params }: { params: Promise<{ document
           <p>Panat Ruangsri<br />Schweiz<br /><a href="mailto:panat@ruangsri.ch">panat@ruangsri.ch</a></p>
           <p className="legal-notice">Die vollständige Betreiberanschrift muss vor der Veröffentlichung ergänzt werden.</p>
           <h2>Domain & Webhosting</h2>
-          <p>Die Domain panat.ruangsri.ch wird über Swizzonic verwaltet. Das Webhosting und die Auslieferung dieser Website erfolgen über Netlify.</p>
+          <p>Die Domain ruangsri.ch wird über Swizzonic verwaltet. Das Webhosting und die Auslieferung von ruangsri.ch/panat erfolgen über Netlify.</p>
           <h2>Über diese Website</h2>
           <p>Dieses persönliche Portfolio stellt meine Ausbildung, beruflichen Tätigkeiten und Interessen vor. Erwähnte Unternehmen und Marken gehören ihren jeweiligen Inhabern. Das Portfolio ist keine offizielle Website von Swisscom oder Reb-Thai.</p>
           <h2>Inhalte & Rechte</h2>
