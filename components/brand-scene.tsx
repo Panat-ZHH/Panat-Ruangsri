@@ -414,13 +414,14 @@ export default function BrandScene() {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    const compactViewport = window.matchMedia('(max-width: 760px)').matches;
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
     } catch {
-      setWebglUnavailable(true);
-      return;
+      const fallbackFrame = window.requestAnimationFrame(() => setWebglUnavailable(true));
+      return () => window.cancelAnimationFrame(fallbackFrame);
     }
 
     const scene = new THREE.Scene();
@@ -429,7 +430,7 @@ export default function BrandScene() {
     scene.environment = environmentTarget.texture;
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 30);
     camera.position.set(0, 0, 6.4);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compactViewport ? 1 : 1.5));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -447,7 +448,7 @@ export default function BrandScene() {
     const floatTargets = renderer.extensions.has('EXT_color_buffer_float');
     const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
       type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
-      samples: 4,
+      samples: compactViewport ? 0 : 4,
       depthBuffer: true,
     });
     const waveTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(1, 1, {
@@ -1004,7 +1005,7 @@ export default function BrandScene() {
     const textureLoader = new THREE.TextureLoader();
     const cardTextures: THREE.Texture[] = [];
     let sceneDisposed = false;
-    const cards = ['/software-card.png', '/founder-card.png', '/sideJobs-card.png', '/more-card.png'].map((source, index) => {
+    const cards = ['/software-card.webp', '/founder-card.webp', '/sideJobs-card.webp', '/more-card.webp'].map((source, index) => {
       const material = new THREE.ShaderMaterial({
         ...cardMaterialParameters,
         uniforms: {
@@ -1205,7 +1206,6 @@ export default function BrandScene() {
     const cardStops = [1.5, 2.2, 3.2, 4.2, 5.2, 6.2, 7.8];
     const outroGrowStart = 6.6;
     const outroGrowEnd = 7.6;
-    const heroElement = host.closest<HTMLElement>('.hero');
     let outroGrow = 0;
     const snapRanges = [[0, transitionEnd], ...cardStops.slice(0, -1).map((start, index) => [start, cardStops[index + 1]])];
     const cardActions = Array.from(host.closest('.hero')?.querySelectorAll<HTMLElement>('.hero-card-action') ?? []);
@@ -1333,7 +1333,7 @@ export default function BrandScene() {
       const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
       if (cardGestureTarget === null && current < 1.45
         && (movement <= 0 || current + movement * 0.4 / window.innerHeight < cardStops[0])) return false;
-      if (cardGestureTarget === null && current > cardStops[cardStops.length - 1] + 0.05) return false;
+      if (cardGestureTarget === null && current > cardStops[cardStops.length - 1] + 0.01) return false;
       const direction = Math.sign(movement);
       if (direction === 0) return true;
       const magnitude = Math.abs(movement);
@@ -1475,7 +1475,6 @@ export default function BrandScene() {
       scrollRotation.set(0, 0, 0);
       outroGrow = 0;
       group.scale.setScalar(1);
-      heroElement?.style.setProperty('--outro-white', '0');
       ledScreenMaterial.uniforms.uSceneActive.value = 0;
       updateCards();
       if (needsRender) renderWithRefraction();
@@ -1504,7 +1503,6 @@ export default function BrandScene() {
       updateCards();
       outroGrow = THREE.MathUtils.smoothstep(scrollProgress, outroGrowStart, outroGrowEnd);
       group.scale.setScalar(1 + outroGrow ** 3 * 14);
-      heroElement?.style.setProperty('--outro-white', THREE.MathUtils.smoothstep(scrollProgress, 7.25, 7.7).toFixed(3));
       sceneBlendTarget = THREE.MathUtils.smoothstep(scrollProgress, 0, transitionEnd);
       const nextActive = scrollProgress > 0;
       if (!nextActive && modelActive) endDrag();
@@ -1571,6 +1569,10 @@ export default function BrandScene() {
     const effectStartedAt = performance.now();
     const renderFrame = (time: number) => {
       if (!visible || document.hidden) return;
+      if (compactViewport && time - previousTime < 1000 / 30) {
+        frameId = window.requestAnimationFrame(renderFrame);
+        return;
+      }
       updateModelActivation();
       const scrollDistance = scrollProgress * window.innerHeight;
       const snapRange = snapRanges.find(([start, end]) =>
@@ -1579,6 +1581,14 @@ export default function BrandScene() {
       const intendedProgress = smoothScroll?.current?.isScrolling === 'smooth'
         ? (smoothScroll.current.targetScroll - containerTop) / window.innerHeight : scrollProgress;
       if (snapTarget !== null && Math.abs(window.scrollY - snapTarget) <= 1) snapTarget = null;
+      const outroStop = cardStops[cardStops.length - 1];
+      // Momentum scrolling up out of the quote hands over to the outro step instead of stalling mid-transition.
+      if (snapTarget === null && cardGestureTarget === null && smoothScroll?.current?.isScrolling === 'smooth'
+        && scrollProgress > outroGrowStart && scrollProgress <= outroStop + 0.02
+        && intendedProgress < outroStop - 0.02 && intendedProgress < scrollProgress) {
+        gestureLastInput = time;
+        startCardStep(-1, time);
+      }
       if (snapTarget === null && queuedDirection !== 0 && cardGestureTarget !== null) {
         const direction = queuedDirection;
         queuedDirection = 0;
@@ -1657,7 +1667,8 @@ export default function BrandScene() {
         updateModelRotation(smoothing);
         stepWaves(delta);
       }
-      if (!reduceMotion) renderWithRefraction();
+      // Past this point the quote page fully covers the scene, so skip the expensive full-screen glass render.
+      if (!reduceMotion && scrollProgress < 7.72) renderWithRefraction();
       frameId = window.requestAnimationFrame(renderFrame);
     };
     const observer = new IntersectionObserver(([entry]) => {

@@ -160,26 +160,29 @@ export default function SoftwareDetails() {
     const timeline = timelineRef.current;
     const path = pathRef.current;
     const scroller = timeline?.closest('.details-sheet__scroll');
-    if (!timeline || !path || !scroller) return;
+    if (!timeline || !path) return;
+    const scrollSource = scroller ?? window;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    timeline.dataset.animated = String(!reduceMotion);
     const items = Array.from(timeline.querySelectorAll<HTMLElement>('.sd-timeline__item'));
     const placeDots = () => items.forEach((item) => {
-      const y = (item.offsetTop + item.offsetHeight / 2) / timeline.offsetHeight * 100;
+      const y = (item.getBoundingClientRect().top - timeline.getBoundingClientRect().top + item.offsetHeight / 2) / timeline.offsetHeight * 100;
       item.style.setProperty('--dot-x', `${lineX(y)}%`);
       item.dataset.position = String(y / 100);
     });
     const update = () => {
       const bounds = timeline.getBoundingClientRect();
-      const reach = scroller.getBoundingClientRect().top + scroller.clientHeight * 0.72;
-      const progress = Math.min(1, Math.max(0, (reach - bounds.top) / bounds.height));
+      const reach = scroller ? scroller.getBoundingClientRect().top + scroller.clientHeight * 0.72 : window.innerHeight * 0.72;
+      const progress = reduceMotion ? 1 : Math.min(1, Math.max(0, (reach - bounds.top) / bounds.height));
       path.style.clipPath = `inset(0 0 ${((1 - progress) * 100).toFixed(2)}% 0)`;
       items.forEach((item) => { item.dataset.visible = String(Number(item.dataset.position) <= progress + 0.02); });
     };
     const resize = new ResizeObserver(() => { placeDots(); update(); });
     resize.observe(timeline);
-    scroller.addEventListener('scroll', update, { passive: true });
+    scrollSource.addEventListener('scroll', update, { passive: true });
     return () => {
       resize.disconnect();
-      scroller.removeEventListener('scroll', update);
+      scrollSource.removeEventListener('scroll', update);
     };
   }, []);
 

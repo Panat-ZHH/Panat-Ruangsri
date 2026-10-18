@@ -57,11 +57,11 @@ const hobbies: { id: string; name: string; period: string; title: string; text: 
 
 function CountUp({ stat }: { stat: Stat }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [value, setValue] = useState(0);
+  const [value, setValue] = useState(stat.value);
 
   useEffect(() => {
     const element = ref.current;
-    if (!element || stat.text) return;
+    if (!element || stat.text || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     let frame = 0;
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting) return;

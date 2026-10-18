@@ -1,64 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSmoothScroll } from '@/components/smooth-scroll';
 
-import SoftwareDetails from '@/components/software-details';
-import FounderDetails from '@/components/founder-details';
-import SideJobDetails from '@/components/side-job-details';
-import HobbyDetails from '@/components/hobby-details';
-
-const softwareTheme = {
-  '--theme-accent': '#3d9bff',
-  '--theme-accent-rgb': '61,155,255',
-  '--theme-on-accent': '#ffffff',
-  '--theme-top': '#0b1528',
-  '--theme-bottom': '#03060d',
-  '--theme-surface': '9,16,30',
-  '--theme-dot': '120,170,255',
-  '--theme-title': 'linear-gradient(180deg, #6fd0ff 0%, #2f86ff 55%, #1f55f0 100%)',
-} as CSSProperties;
-
-const founderTheme = {
-  '--theme-accent': '#9db495',
-  '--theme-accent-rgb': '157,180,149',
-  '--theme-on-accent': '#0c0e0b',
-  '--theme-top': '#171612',
-  '--theme-bottom': '#080807',
-  '--theme-surface': '22,22,18',
-  '--theme-dot': '210,200,180',
-  '--theme-title': 'linear-gradient(180deg, #b3c6ad 0%, #8aa283 50%, #667f60 100%)',
-} as CSSProperties;
-
-const sideJobTheme = {
-  '--theme-accent': '#e39d5c',
-  '--theme-accent-rgb': '227,157,92',
-  '--theme-on-accent': '#1a0f08',
-  '--theme-top': '#26160d',
-  '--theme-bottom': '#0c0705',
-  '--theme-surface': '32,20,13',
-  '--theme-dot': '230,190,150',
-  '--theme-title': 'linear-gradient(180deg, #b9ccb3 0%, #91aa8b 55%, #6f8a69 100%)',
-} as CSSProperties;
-
-const hobbyTheme = {
-  '--theme-accent': '#a8c293',
-  '--theme-accent-rgb': '168,194,147',
-  '--theme-on-accent': '#0b0d0a',
-  '--theme-top': '#151613',
-  '--theme-bottom': '#060606',
-  '--theme-surface': '21,22,19',
-  '--theme-dot': '200,205,190',
-  '--theme-title': 'linear-gradient(180deg, #f2efe6 0%, #c9d8bd 45%, #8faa7f 100%)',
-} as CSSProperties;
-
-const details: { title: string; eyebrow?: string; content?: ReactNode; theme?: CSSProperties }[] = [
-  { title: 'Software Developer', eyebrow: 'Swisscom', content: <SoftwareDetails />, theme: softwareTheme },
-  { title: 'Founder & CEO', eyebrow: 'Wendico KLG', content: <FounderDetails />, theme: founderTheme },
-  { title: 'Side Jobs', eyebrow: 'Reb-Thai', content: <SideJobDetails />, theme: sideJobTheme },
-  { title: 'Hobbys', eyebrow: 'Beyond work', content: <HobbyDetails />, theme: hobbyTheme },
-];
+import { portfolioPages as details } from '@/components/portfolio-content';
 
 export default function CardDetails() {
   const smoothScroll = useSmoothScroll();
@@ -75,21 +21,41 @@ export default function CardDetails() {
     if (active === null) return;
     const root = document.documentElement;
     root.classList.add('details-open');
-    smoothScroll?.current?.stop();
+    const controller = smoothScroll?.current;
+    controller?.stop();
     const frame = requestAnimationFrame(() => setShown(true));
     closeRef.current?.focus({ preventScroll: true });
+    const background = Array.from(document.querySelectorAll<HTMLElement>('main, .site-header, .site-footer'));
+    const inertStates = background.map((element) => element.inert);
+    background.forEach((element) => { element.inert = true; });
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setShown(false);
+      if (event.key === 'Tab') {
+        const panel = closeRef.current?.closest('article');
+        const focusable = Array.from(panel?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, iframe, [tabindex="0"]') ?? [])
+          .filter((element) => element.getClientRects().length > 0 && element.tabIndex >= 0);
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('keydown', onKeyDown);
       root.classList.remove('details-open');
-      smoothScroll?.current?.start();
+      background.forEach((element, index) => { element.inert = inertStates[index]; });
+      controller?.start();
       triggerRef.current?.focus({ preventScroll: true });
     };
   }, [active, smoothScroll]);
+
+  useEffect(() => {
+    if (active === null || shown) return;
+    const timer = window.setTimeout(() => setActive(null), 800);
+    return () => window.clearTimeout(timer);
+  }, [active, shown]);
 
   useEffect(() => {
     const scroller = scrollRef.current;
@@ -120,9 +86,11 @@ export default function CardDetails() {
     const onTouchStart = (event: TouchEvent) => { touchY = event.touches[0].clientY; };
     const onTouchMove = (event: TouchEvent) => {
       const delta = touchY - event.touches[0].clientY;
+      touchY = event.touches[0].clientY;
       if (Math.abs(delta) > 6) handle(delta, event);
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
       if (['ArrowDown', 'PageDown'].includes(event.key)) handle(1, event);
       if (['ArrowUp', 'PageUp'].includes(event.key)) handle(-1, event);
     };

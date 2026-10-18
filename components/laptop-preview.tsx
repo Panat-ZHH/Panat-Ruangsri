@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { usePrivacy } from '@/components/privacy-preferences';
+import Link from 'next/link';
 
 const SITE_URL = 'https://wendico.ch';
 const VIEWPORT_WIDTH = 1280;
 
 export default function LaptopPreview() {
+  const { external, allowExternal } = usePrivacy();
   const [open, setOpen] = useState(true);
   const [scale, setScale] = useState(0.5);
   const displayRef = useRef<HTMLDivElement>(null);
@@ -43,7 +46,7 @@ export default function LaptopPreview() {
           <div className="laptop__lid">
             <div className="laptop__screen">
               <div ref={displayRef} className="laptop__display">
-                <iframe
+                {external ? <iframe
                   src={SITE_URL}
                   title="Wendico website"
                   loading="lazy"
@@ -51,7 +54,14 @@ export default function LaptopPreview() {
                   referrerPolicy="no-referrer"
                   tabIndex={open ? 0 : -1}
                   style={{ width: VIEWPORT_WIDTH, height: `${100 / scale}%`, transform: `scale(${scale})` }}
-                />
+                /> : (
+                  <div className="laptop__consent">
+                    <strong>Wendico live</strong>
+                    <p>Die Vorschau lädt die externe Website wendico.ch und übermittelt dabei Daten wie deine IP-Adresse.</p>
+                    <button type="button" onClick={allowExternal}>Externe Vorschau laden</button>
+                    <Link href="/legal/privacy">Datenschutzhinweise</Link>
+                  </div>
+                )}
               </div>
             </div>
             <button type="button" className="laptop__cover" aria-label="Open laptop" tabIndex={open ? -1 : 0} onClick={() => setOpen(true)}>
