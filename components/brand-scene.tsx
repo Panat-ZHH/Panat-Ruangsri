@@ -417,7 +417,6 @@ export default function BrandScene() {
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const compactViewport = window.matchMedia('(max-width: 760px)').matches;
     const nativeTouchScrolling = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const loaderSafetyTimeout = window.setTimeout(() => {
       sceneReadyRef.current = true;
@@ -464,7 +463,7 @@ export default function BrandScene() {
     const floatTargets = renderer.extensions.has('EXT_color_buffer_float');
     const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
       type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
-      samples: Math.min(4, renderer.capabilities.maxSamples),
+      samples: nativeTouchScrolling ? 0 : Math.min(4, renderer.capabilities.maxSamples),
       depthBuffer: true,
     });
     const waveTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(1, 1, {
@@ -1098,7 +1097,8 @@ export default function BrandScene() {
       monogram.scale.setScalar(Math.min(0.78, visibleWidth * 0.9 / 4.12));
       panatWordmark.scale.setScalar(Math.min(1, visibleWidth * (camera.position.z + 1.3) / camera.position.z * 1.18 / 9.2));
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3, Math.sqrt(4_000_000 / (width * height))));
+      const pixelBudget = nativeTouchScrolling ? 1_500_000 : 4_000_000;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3, Math.sqrt(pixelBudget / (width * height))));
       renderer.setSize(width, height, false);
       renderer.getDrawingBufferSize(refractionResolution);
       refractionTarget.setSize(refractionResolution.x, refractionResolution.y);
@@ -1597,10 +1597,6 @@ export default function BrandScene() {
     const effectStartedAt = performance.now();
     const renderFrame = (time: number) => {
       if (!visible || document.hidden) return;
-      if (compactViewport && time - previousTime < 1000 / 30) {
-        frameId = window.requestAnimationFrame(renderFrame);
-        return;
-      }
       updateModelActivation();
       const scrollDistance = scrollProgress * window.innerHeight;
       const snapRange = nativeTouchScrolling ? undefined : snapRanges.find(([start, end]) =>
