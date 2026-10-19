@@ -1353,7 +1353,13 @@ export default function BrandScene() {
       const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
       if (cardGestureTarget === null && current < 1.45
         && (movement <= 0 || current + movement * 0.4 / window.innerHeight < cardStops[0])) return false;
-      if (cardGestureTarget === null && current > cardStops[cardStops.length - 1] + 0.01) return false;
+      if (current > cardStops[cardStops.length - 1] + 0.01) {
+        cardGestureTarget = null;
+        queuedDirection = 0;
+        gestureReady = true;
+        gestureDistance = 0;
+        return false;
+      }
       const direction = Math.sign(movement);
       if (direction === 0) return true;
       const magnitude = Math.abs(movement);
