@@ -31,8 +31,8 @@ a { color: inherit; text-decoration: none; }
 .ruangsri-card { min-width: 0; overflow: hidden; border: 1px solid #303733; border-radius: 6px; background: #141a17; transition: transform 400ms cubic-bezier(.2,.7,.2,1), border-color 300ms, box-shadow 400ms; }
 .ruangsri-card__link { display: block; position: relative; isolation: isolate; aspect-ratio: 1 / 1.15; }
 .ruangsri-card__portrait { position: absolute; inset: 0; overflow: hidden; }
-.ruangsri-card__portrait::after { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(180deg, transparent 42%, rgba(6,10,8,.35) 65%, #080a0a 100%); pointer-events: none; }
-.ruangsri-card__portrait img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 32%; transition: transform 700ms cubic-bezier(.2,.7,.2,1); }
+.ruangsri-card__portrait::after { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(180deg, transparent 42%, rgba(6,10,8,.35) 65%, #080a0a 94%); pointer-events: none; }
+.ruangsri-card__portrait img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 32%; mask-image: linear-gradient(#000 75%, transparent 98%); transition: transform 700ms cubic-bezier(.2,.7,.2,1); }
 .ruangsri-card:nth-child(2) img { object-position: center 26%; }
 .ruangsri-card__content { position: absolute; z-index: 2; inset: auto 26px 24px; display: flex; align-items: end; justify-content: space-between; gap: 12px; }
 .ruangsri-card__name { display: block; min-width: 0; font-size: 28px; font-weight: 600; line-height: 1.2; }
@@ -56,9 +56,6 @@ a { color: inherit; text-decoration: none; }
 .family-world__canvas canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
 .family-world__canvas canvas:active { cursor: grabbing; }
 .family-world__marker { position: absolute; top: 0; left: 0; opacity: 0; padding: 9px 12px; margin: -42px 0 0 12px; border: 1px solid #c8b48355; border-radius: 3px; background: #0d1411ed; color: #e1d4b5; font-size: 12px; pointer-events: none; }
-.family-world__tools { position: absolute; right: 0; bottom: 26px; display: flex; gap: 8px; }
-.family-world__tools button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #3b463f; border-radius: 50%; background: #111713; color: #d4dad3; cursor: pointer; }
-.family-world__tools button:hover:not(:disabled) { border-color: var(--family-accent); color: var(--family-accent); }
 .family-world button:disabled { opacity: .4; cursor: default; }
 .family-world__places { width: min(640px, 100%); margin: -6px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
 .family-world__places button { display: flex; align-items: center; gap: 16px; min-height: 88px; padding: 15px 0; border: 0; border-top: 1px solid #3b463f; color: #e9ece5; background: none; font-family: inherit; font-size: 18px; text-align: left; cursor: pointer; transition: border-color 200ms, color 200ms; }
@@ -503,7 +500,6 @@ html.details-open { overflow: hidden; }
   .family-world__heading h2 { font-size: 32px; }
   .family-world__heading p { max-width: 270px; margin: 16px auto 0; font-size: 13px; }
   .family-world__stage { height: 470px; margin-top: 0; }
-  .family-world__tools { bottom: 5px; right: 0; }
   .family-world__marker { font-size: 10px; padding: 7px 8px; }
   .family-world__places { gap: 22px; margin-top: 22px; }
   .family-world__places button { gap: 8px; font-size: 16px; }

@@ -418,6 +418,7 @@ export default function BrandScene() {
     const host = hostRef.current;
     if (!host) return;
     const compactViewport = window.matchMedia('(max-width: 760px)').matches;
+    const nativeTouchScrolling = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
     const loaderSafetyTimeout = window.setTimeout(() => {
       sceneReadyRef.current = true;
       setSceneReady(true);
@@ -1178,6 +1179,7 @@ export default function BrandScene() {
       group.quaternion.slerp(targetRotation, blend);
     };
     const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === 'touch') return;
       if (!modelActive || inCardSection || event.button !== 0 || dragPointerId !== null) return;
       if (event.target instanceof Element && event.target.closest('a, button, input, select, textarea')) return;
       const bounds = host.getBoundingClientRect();
@@ -1346,6 +1348,7 @@ export default function BrandScene() {
       return true;
     };
     const consumeCardGesture = (movement: number, time: number, source: 'wheel' | 'touch' | 'key' = 'wheel') => {
+      if (nativeTouchScrolling) return false;
       const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
       const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
       if (cardGestureTarget === null && current < 1.45
@@ -1550,10 +1553,12 @@ export default function BrandScene() {
     window.addEventListener('pointerup', onSnapPointerUp);
     window.addEventListener('pointercancel', onSnapPointerUp);
     window.addEventListener('keydown', onSnapKeyDown, { capture: true });
-    window.addEventListener('touchstart', onCardTouchStart, { passive: true, capture: true });
-    window.addEventListener('touchmove', onCardTouchMove, { passive: false, capture: true });
-    window.addEventListener('touchend', onCardTouchEnd, { passive: true, capture: true });
-    window.addEventListener('touchcancel', onCardTouchEnd, { passive: true, capture: true });
+    if (!nativeTouchScrolling) {
+      window.addEventListener('touchstart', onCardTouchStart, { passive: true, capture: true });
+      window.addEventListener('touchmove', onCardTouchMove, { passive: false, capture: true });
+      window.addEventListener('touchend', onCardTouchEnd, { passive: true, capture: true });
+      window.addEventListener('touchcancel', onCardTouchEnd, { passive: true, capture: true });
+    }
     window.addEventListener('blur', onSnapPointerUp);
     window.addEventListener('resize', cancelScrollSnap);
 
@@ -1592,7 +1597,7 @@ export default function BrandScene() {
       }
       updateModelActivation();
       const scrollDistance = scrollProgress * window.innerHeight;
-      const snapRange = snapRanges.find(([start, end]) =>
+      const snapRange = nativeTouchScrolling ? undefined : snapRanges.find(([start, end]) =>
         scrollDistance > window.innerHeight * start + 1 && scrollDistance < window.innerHeight * end - 1);
       const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
       const intendedProgress = smoothScroll?.current?.isScrolling === 'smooth'

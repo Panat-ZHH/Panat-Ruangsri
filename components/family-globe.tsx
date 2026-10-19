@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MapPin, Minus, Pause, Play, Plus, RotateCcw } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 
 const places = [
   { id: 'ch', name: 'Schweiz', latitude: 46.82, longitude: 8.23, coordinates: '46.82° N / 8.23° E' },
@@ -13,7 +13,6 @@ export function FamilyGlobe() {
   const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const actionRef = useRef<(action: string) => void>(() => {});
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [rotating, setRotating] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,7 +48,6 @@ export function FamilyGlobe() {
         controls.autoRotateSpeed = 0.35;
         const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         controls.autoRotate = !motionQuery.matches;
-        setRotating(controls.autoRotate);
         const geometries: InstanceType<typeof THREE.BufferGeometry>[] = [];
         const materials: InstanceType<typeof THREE.Material>[] = [];
         const textures: InstanceType<typeof THREE.Texture>[] = [];
@@ -119,25 +117,14 @@ export function FamilyGlobe() {
         controls.addEventListener('start', stopFocus);
         const onMotionChange = () => {
           controls.autoRotate = !motionQuery.matches;
-          setRotating(controls.autoRotate);
         };
         motionQuery.addEventListener('change', onMotionChange);
         actionRef.current = action => {
-          if (action === 'rotate') {
-            focusTarget = null;
-            controls.autoRotate = !controls.autoRotate;
-          } else if (action === 'zoom-in' || action === 'zoom-out') {
-            const distance = THREE.MathUtils.clamp(camera.position.length() * (action === 'zoom-in' ? 0.8 : 1.25), controls.minDistance, controls.maxDistance);
-            focusTarget = camera.position.clone().normalize().multiplyScalar(distance);
-            controls.autoRotate = false;
-            if (motionQuery.matches) camera.position.copy(focusTarget);
-          } else {
-            const placeIndex = places.findIndex(place => place.id === action);
-            focusTarget = placeIndex < 0 ? initialPosition.clone() : markerPositions[placeIndex].clone().normalize().multiplyScalar(camera.position.length());
-            controls.autoRotate = action === 'reset' && !motionQuery.matches;
-            if (motionQuery.matches) camera.position.copy(focusTarget);
-          }
-          setRotating(controls.autoRotate);
+          const placeIndex = places.findIndex(place => place.id === action);
+          if (placeIndex < 0) return;
+          focusTarget = markerPositions[placeIndex].clone().normalize().multiplyScalar(camera.position.length());
+          controls.autoRotate = false;
+          if (motionQuery.matches) camera.position.copy(focusTarget);
         };
         let previousTime = 0;
         renderer.setAnimationLoop((time: number) => {
@@ -240,12 +227,6 @@ export function FamilyGlobe() {
         </div>
         {status === 'loading' && <div className="family-world__loading" role="status"><span />Weltkugel wird geladen</div>}
         {status === 'error' && <p className="family-world__error" role="status">Die 3D-Ansicht ist in diesem Browser nicht verfügbar.<br />Verbunden zwischen der Schweiz und Thailand.</p>}
-        <div className="family-world__tools">
-          <button type="button" disabled={status !== 'ready'} onClick={() => { actionRef.current('zoom-in'); }} aria-label="Vergrößern" title="Vergrößern"><Plus size={17} /></button>
-          <button type="button" disabled={status !== 'ready'} onClick={() => { actionRef.current('zoom-out'); }} aria-label="Verkleinern" title="Verkleinern"><Minus size={17} /></button>
-          <button type="button" disabled={status !== 'ready'} onClick={() => { actionRef.current('rotate'); }} aria-label={rotating ? 'Rotation pausieren' : 'Rotation starten'} title={rotating ? 'Rotation pausieren' : 'Rotation starten'}>{rotating ? <Pause size={17} /> : <Play size={17} />}</button>
-          <button type="button" disabled={status !== 'ready'} onClick={() => { actionRef.current('reset'); setSelected(null); }} aria-label="Ansicht zurücksetzen" title="Ansicht zurücksetzen"><RotateCcw size={17} /></button>
-        </div>
       </div>
       <div className="family-world__places" aria-label="Länder auf der Weltkugel">
         {places.map(place => <button key={place.id} type="button" disabled={status !== 'ready'} aria-pressed={selected === place.id} onClick={() => { setSelected(place.id); actionRef.current(place.id); }}><MapPin size={18} strokeWidth={1.5} aria-hidden="true" /><span>{place.name}<small>{place.coordinates}</small></span><span className={`family-world__flag family-world__flag--${place.id}`} aria-hidden="true" /></button>)}

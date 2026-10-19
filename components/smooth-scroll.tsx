@@ -14,6 +14,7 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const nativeTouch = window.matchMedia('(hover: none) and (pointer: coarse)');
     let wasBelowTop = window.scrollY > 1;
     const detectTop = (position: number) => {
       if (position <= 1 && wasBelowTop) window.dispatchEvent(new Event('panat:scroll-top'));
@@ -22,7 +23,7 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
     const onNativeScroll = () => detectTop(window.scrollY);
     const configure = () => {
       controller.current?.destroy();
-      controller.current = preference.matches ? null : new Lenis({
+      controller.current = preference.matches || nativeTouch.matches ? null : new Lenis({
         autoRaf: true,
         anchors: true,
         smoothWheel: true,
@@ -54,10 +55,12 @@ export default function SmoothScroll({ children }: { children: ReactNode }) {
     };
     configure();
     preference.addEventListener('change', configure);
+    nativeTouch.addEventListener('change', configure);
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('scroll', onNativeScroll, { passive: true });
     return () => {
       preference.removeEventListener('change', configure);
+      nativeTouch.removeEventListener('change', configure);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('scroll', onNativeScroll);
       controller.current?.destroy();
