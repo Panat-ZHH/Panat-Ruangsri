@@ -1097,7 +1097,7 @@ export default function BrandScene() {
       monogram.scale.setScalar(Math.min(0.78, visibleWidth * 0.9 / 4.12));
       panatWordmark.scale.setScalar(Math.min(1, visibleWidth * (camera.position.z + 1.3) / camera.position.z * 1.18 / 9.2));
       camera.updateProjectionMatrix();
-      const pixelBudget = nativeTouchScrolling ? 1_500_000 : 4_000_000;
+      const pixelBudget = nativeTouchScrolling ? 1_800_000 : 4_000_000;
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3, Math.sqrt(pixelBudget / (width * height))));
       renderer.setSize(width, height, false);
       renderer.getDrawingBufferSize(refractionResolution);
