@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
+import { ArrowUpRight } from 'lucide-react';
+import { FamilyGlobe } from '@/components/family-globe';
 
 export const metadata: Metadata = {
   title: 'Familie Ruangsri | Pawat, Panat & Phanuphon Ruangsri',
@@ -45,25 +47,29 @@ export default function RuangsriHomePage() {
     <main id="main-content" className="ruangsri-home">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(profileList).replace(/</g, '\\u003c') }} />
       <section className="ruangsri-directory" aria-labelledby="directory-title">
-        <h1 id="directory-title" className="visually-hidden">Ruangsri</h1>
+        <header className="ruangsri-intro">
+          <p className="ruangsri-intro__eyebrow">Eine Familie. Drei Persönlichkeiten.</p>
+          <h1 id="directory-title">RUANGSRI</h1>
+          <p className="ruangsri-intro__origin">In der Schweiz zu Hause. Mit Thailand verbunden.</p>
+        </header>
         <div className="ruangsri-cards">
           {profiles.map((profile) => (
-            <article key={profile.name} className={`ruangsri-card${profile.href ? ' ruangsri-card--active' : ''}`}>
-              <div className="ruangsri-card__content">
+            <article key={profile.name} className="ruangsri-card">
+              <Link href={profile.href} className="ruangsri-card__link" target={profile.external ? '_blank' : undefined} rel={profile.external ? 'noopener noreferrer' : undefined} aria-label={`${profile.name} ${profile.name.startsWith('Phanuphon') ? 'LinkedIn' : 'Zur Website'}${profile.external ? ' (öffnet in neuem Tab)' : ''}`}>
                 <span className="ruangsri-card__portrait">
-                  <Image src={profile.photo} alt={`Porträt von ${profile.name}`} width={profile.width} height={profile.height} sizes="(max-width: 760px) 100px, 18vw" priority />
+                  <Image src={profile.photo} alt={`Porträt von ${profile.name}`} width={profile.width} height={profile.height} sizes="(max-width: 760px) 90vw, 30vw" priority />
                 </span>
-                <span className="ruangsri-card__name">{profile.name}</span>
-                {profile.external ? (
-                  <a href={profile.href} className="ruangsri-card__button" target="_blank" rel="noopener noreferrer">Zur Website</a>
-                ) : (
-                  <Link href={profile.href} className="ruangsri-card__button">Zur Website</Link>
-                )}
-              </div>
+                <span className="ruangsri-card__content">
+                  <span className="ruangsri-card__name">{profile.name.split(' ')[0]}<span>Ruangsri</span></span>
+                  <span className="ruangsri-card__destination">{profile.name.startsWith('Phanuphon') ? 'LinkedIn' : 'Zur Website'}<ArrowUpRight size={20} strokeWidth={1.5} aria-hidden="true" /></span>
+                </span>
+              </Link>
             </article>
           ))}
         </div>
       </section>
+      <FamilyGlobe />
+      <footer className="ruangsri-footer"><span>Familie Ruangsri</span><span>Schweiz & Thailand</span></footer>
     </main>
   );
 }

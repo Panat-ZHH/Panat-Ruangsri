@@ -445,7 +445,7 @@ export default function BrandScene() {
     scene.environment = environmentTarget.texture;
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 30);
     camera.position.set(0, 0, 6.4);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compactViewport ? 1 : 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
@@ -463,7 +463,7 @@ export default function BrandScene() {
     const floatTargets = renderer.extensions.has('EXT_color_buffer_float');
     const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
       type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
-      samples: compactViewport ? 0 : 4,
+      samples: Math.min(4, renderer.capabilities.maxSamples),
       depthBuffer: true,
     });
     const waveTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(1, 1, {
@@ -1058,6 +1058,7 @@ export default function BrandScene() {
         renderWithRefraction();
       });
       texture.colorSpace = THREE.SRGBColorSpace;
+      texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
       material.uniforms.uCardPhoto.value = texture;
       cardTextures.push(texture);
       const card = new THREE.Mesh(cardGeometry, material);
@@ -1096,6 +1097,7 @@ export default function BrandScene() {
       monogram.scale.setScalar(Math.min(0.78, visibleWidth * 0.9 / 4.12));
       panatWordmark.scale.setScalar(Math.min(1, visibleWidth * (camera.position.z + 1.3) / camera.position.z * 1.18 / 9.2));
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3, Math.sqrt(4_000_000 / (width * height))));
       renderer.setSize(width, height, false);
       renderer.getDrawingBufferSize(refractionResolution);
       refractionTarget.setSize(refractionResolution.x, refractionResolution.y);
