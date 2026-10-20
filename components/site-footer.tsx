@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { PrivacySettingsButton } from '@/components/privacy-preferences';
+import PortfolioLink from '@/components/portfolio-link';
 
 export default function SiteFooter() {
   return (
@@ -9,10 +10,10 @@ export default function SiteFooter() {
         <a href="mailto:panat@ruangsri.ch">panat@ruangsri.ch</a>
       </div>
       <nav className="site-footer__pages" aria-label="Portfolio">
-        <Link href="/panat/software-developer">Software Developer</Link>
-        <Link href="/panat/founder">Founder &amp; CEO</Link>
-        <Link href="/panat/side-jobs">Nebenjob</Link>
-        <Link href="/panat/hobbys">Hobbys</Link>
+        <PortfolioLink href="/panat/software-developer" slug="software-developer">Software Developer</PortfolioLink>
+        <PortfolioLink href="/panat/founder" slug="founder">Founder &amp; CEO</PortfolioLink>
+        <PortfolioLink href="/panat/side-jobs" slug="side-jobs">Nebenjob</PortfolioLink>
+        <PortfolioLink href="/panat/hobbys" slug="hobbys">Hobbys</PortfolioLink>
       </nav>
       <div className="site-footer__bottom">
         <span>© {new Date().getFullYear()} Panat Ruangsri</span>

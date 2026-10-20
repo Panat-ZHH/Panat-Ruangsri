@@ -5,6 +5,28 @@ import { createPortal } from 'react-dom';
 import { useSmoothScroll } from '@/components/smooth-scroll';
 
 import { portfolioPages as details } from '@/components/portfolio-content';
+import { PORTFOLIO_DETAIL_EVENT, showPortfolioDetail } from '@/components/portfolio-navigation';
+
+export function HeroCardActions() {
+  return (
+    <div className="hero-card-actions">
+      {details.map((entry) => (
+        <button
+          key={entry.title}
+          type="button"
+          className="hero-card-action"
+          aria-label={`${entry.title} Details`}
+          hidden
+          onClick={() => showPortfolioDetail(entry.slug)}
+        >
+          <span className="hero-card-action__dot" aria-hidden="true" />
+          Details
+          <span className="hero-card-action__arrow" aria-hidden="true">↗</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function CardDetails() {
   const smoothScroll = useSmoothScroll();
@@ -12,10 +34,23 @@ export default function CardDetails() {
   const [shown, setShown] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const close = () => setShown(false);
+
+  useEffect(() => {
+    const onOpenDetail = (event: Event) => {
+      const slug = (event as CustomEvent<string>).detail;
+      const index = details.findIndex((entry) => entry.slug === slug);
+      if (index < 0) return;
+      triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setExpanded(false);
+      setActive(index);
+    };
+    window.addEventListener(PORTFOLIO_DETAIL_EVENT, onOpenDetail);
+    return () => window.removeEventListener(PORTFOLIO_DETAIL_EVENT, onOpenDetail);
+  }, []);
 
   useEffect(() => {
     if (active === null) return;
@@ -110,26 +145,6 @@ export default function CardDetails() {
 
   return (
     <>
-      <div className="hero-card-actions">
-        {details.map((entry, index) => (
-          <button
-            key={entry.title}
-            type="button"
-            className="hero-card-action"
-            aria-label={`${entry.title} Details`}
-            hidden
-            onClick={(event) => {
-              triggerRef.current = event.currentTarget;
-              setExpanded(false);
-              setActive(index);
-            }}
-          >
-            <span className="hero-card-action__dot" aria-hidden="true" />
-            Details
-            <span className="hero-card-action__arrow" aria-hidden="true">↗</span>
-          </button>
-        ))}
-      </div>
       {item && createPortal(
         <div className={`details-sheet${shown ? ' is-open' : ''}${expanded ? ' is-expanded' : ''}`} style={item.theme} onClick={close}>
           <article

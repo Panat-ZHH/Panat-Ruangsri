@@ -5,6 +5,7 @@ import SiteHeader from '@/components/site-header';
 import SmoothScroll from '@/components/smooth-scroll';
 import PrivacyPreferences from '@/components/privacy-preferences';
 import SiteFooter from '@/components/site-footer';
+import CardDetails from '@/components/card-details';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://ruangsri.ch'),
@@ -29,6 +30,7 @@ export default function PanatLayout({ children }: { children: ReactNode }) {
     <PrivacyPreferences>
       <SmoothScroll>
         <SiteHeader />
+        <CardDetails />
         {children}
         <SiteFooter />
       </SmoothScroll>

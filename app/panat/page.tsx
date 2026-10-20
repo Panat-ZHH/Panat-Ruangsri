@@ -1,5 +1,5 @@
 import BrandScene from '@/components/brand-scene';
-import CardDetails from '@/components/card-details';
+import { HeroCardActions } from '@/components/card-details';
 import QuoteSection from '@/components/quote-section';
 import type { Metadata } from 'next';
 
@@ -38,7 +38,7 @@ export default function PanatHomePage() {
         <section className="hero" id="top" aria-label="Panat Ruangsri homepage">
           <div className="hero__grid" aria-hidden="true" />
           <BrandScene />
-          <CardDetails />
+          <HeroCardActions />
           <span id="about" className="hero-anchor" aria-hidden="true" />
           <span id="experience" className="hero-anchor" aria-hidden="true" />
           <span id="news" className="hero-anchor" aria-hidden="true" />

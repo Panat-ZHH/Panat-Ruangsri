@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { useEffect, useRef, useState } from 'react';
 import { useSmoothScroll } from '@/components/smooth-scroll';
+import { PORTFOLIO_DETAIL_EVENT, PORTFOLIO_NAVIGATE_EVENT } from '@/components/portfolio-navigation';
 
 const REFLECTION_WIDTH = 96;
 const REFLECTION_HEIGHT = 54;
@@ -1326,6 +1327,9 @@ export default function BrandScene() {
     let gestureTouchY = 0;
     let pointerHeld = false;
     let stepDuration = 650;
+    let pendingDetailSlug: string | null = null;
+    let wakeRenderFrame = () => {};
+    const cardSlugs = ['software-developer', 'founder', 'side-jobs', 'hobbys'];
     const scrollImmediately = (top: number) => {
       if (smoothScroll?.current) smoothScroll.current.scrollTo(top, { immediate: true });
       else window.scrollTo({ top, behavior: 'instant' });
@@ -1473,6 +1477,27 @@ export default function BrandScene() {
       touchActive = false;
       gestureLastInput = performance.now();
     };
+    const onNavigateDetail = (event: Event) => {
+      const request = event as CustomEvent<{ slug: string }>;
+      const cardIndex = cardSlugs.indexOf(request.detail.slug);
+      if (cardIndex < 0) return;
+      request.preventDefault();
+      const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
+      const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
+      const destination = 2.2 + cardIndex;
+      const now = performance.now();
+      scrollImmediately(window.scrollY);
+      snapTarget = containerTop + destination * window.innerHeight;
+      snapStartPosition = window.scrollY;
+      snapStartTangent = 0;
+      snapStartedAt = now;
+      stepDuration = Math.max(650, Math.min(1100, Math.abs(destination - current) * 220));
+      cardGestureTarget = destination;
+      gestureLastInput = now;
+      queuedDirection = 0;
+      pendingDetailSlug = request.detail.slug;
+      wakeRenderFrame();
+    };
     function resetModelAtTop() {
       const distance = Math.max(0, -(heroContainer?.getBoundingClientRect().top ?? 0));
       if (distance > 1) return;
@@ -1565,6 +1590,7 @@ export default function BrandScene() {
       window.addEventListener('touchend', onCardTouchEnd, { passive: true, capture: true });
       window.addEventListener('touchcancel', onCardTouchEnd, { passive: true, capture: true });
     }
+      window.addEventListener(PORTFOLIO_NAVIGATE_EVENT, onNavigateDetail);
     window.addEventListener('blur', onSnapPointerUp);
     window.addEventListener('resize', cancelScrollSnap);
 
@@ -1651,7 +1677,14 @@ export default function BrandScene() {
         const carry = snapStartTangent * progress * (1 - progress) ** 2;
         scrollImmediately(THREE.MathUtils.lerp(snapStartPosition, snapTarget, eased) + carry);
         updateModelActivation();
-        if (progress === 1) snapTarget = null;
+        if (progress === 1) {
+          snapTarget = null;
+          if (pendingDetailSlug !== null) {
+            const slug = pendingDetailSlug;
+            pendingDetailSlug = null;
+            window.dispatchEvent(new CustomEvent(PORTFOLIO_DETAIL_EVENT, { detail: slug }));
+          }
+        }
       }
       if (snapTarget === null && queuedDirection !== 0) {
         const direction = queuedDirection;
@@ -1700,8 +1733,13 @@ export default function BrandScene() {
       }
       frameId = window.requestAnimationFrame(renderFrame);
     };
+    wakeRenderFrame = () => {
+      visible = true;
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(renderFrame);
+    };
     const observer = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
+      visible = entry.isIntersecting || pendingDetailSlug !== null;
       window.cancelAnimationFrame(frameId);
       if (!visible) window.clearTimeout(loaderTimerRef.current);
       if (visible) {
@@ -1743,6 +1781,7 @@ export default function BrandScene() {
       window.removeEventListener('touchmove', onCardTouchMove, { capture: true });
       window.removeEventListener('touchend', onCardTouchEnd, { capture: true });
       window.removeEventListener('touchcancel', onCardTouchEnd, { capture: true });
+      window.removeEventListener(PORTFOLIO_NAVIGATE_EVENT, onNavigateDetail);
       window.removeEventListener('blur', onSnapPointerUp);
       window.removeEventListener('resize', cancelScrollSnap);
       document.removeEventListener('visibilitychange', onVisibilityChange);
