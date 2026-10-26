@@ -125,11 +125,14 @@ export default function QuoteSection() {
     chars[chars.length - 1].dataset.last = 'true';
     let frame = 0;
     let written = -1;
+    // Measured in the sticky stage's height (100lvh), the same unit the section is laid out in.
+    const stage = section.querySelector<HTMLElement>('.quote__stage');
+    let viewport = stage?.clientHeight || window.innerHeight;
     const update = () => {
       frame = 0;
       const bounds = section.getBoundingClientRect();
       // The section starts one viewport before the hero releases; distance is measured in viewports from there.
-      const scrolled = -bounds.top / window.innerHeight;
+      const scrolled = -bounds.top / viewport;
       const fade = Math.min(1, Math.max(0, (scrolled - 0.45) / 0.45));
       section.style.setProperty('--quote-fade', (fade * fade * (3 - 2 * fade)).toFixed(3));
       const next = Math.round(Math.min(1, Math.max(0, (scrolled - 0.95) / 1.1)) * chars.length);
@@ -143,13 +146,17 @@ export default function QuoteSection() {
       section.dataset.done = String(next >= chars.length);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+    const onResize = () => {
+      viewport = stage?.clientHeight || window.innerHeight;
+      schedule();
+    };
     update();
     window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
+    window.addEventListener('resize', onResize);
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 

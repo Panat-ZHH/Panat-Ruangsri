@@ -96,8 +96,9 @@ function StarField() {
     let width = 0;
     let height = 0;
     let frame = 0;
+    let visible = false;
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio, 2);
+      const ratio = Math.min(window.devicePixelRatio, 1.5);
       width = canvas.clientWidth;
       height = canvas.clientHeight;
       canvas.width = width * ratio;
@@ -117,18 +118,25 @@ function StarField() {
         context.arc(x, y, 0.4 + star.depth * 1.3, 0, Math.PI * 2);
         context.fill();
       }
-      if (!reduceMotion) frame = requestAnimationFrame(draw);
+      frame = !reduceMotion && visible ? requestAnimationFrame(draw) : 0;
     };
     const observer = new ResizeObserver(() => {
       resize();
       if (reduceMotion) draw(0);
     });
     observer.observe(canvas);
+    // Only animate while the map is on screen inside the scrolling sheet.
+    const visibility = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      cancelAnimationFrame(frame);
+      frame = visible ? requestAnimationFrame(draw) : 0;
+    });
+    visibility.observe(canvas);
     resize();
-    frame = requestAnimationFrame(draw);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      visibility.disconnect();
     };
   }, []);
 

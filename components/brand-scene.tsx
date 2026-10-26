@@ -9,15 +9,18 @@ import { PORTFOLIO_DETAIL_EVENT, PORTFOLIO_NAVIGATE_EVENT } from '@/components/p
 
 const REFLECTION_WIDTH = 96;
 const REFLECTION_HEIGHT = 54;
+const LED_COLUMNS = 36 * 30;
+const LED_ROWS = 7 * 30;
+const SAMPLE_OFFSETS = [-0.18, 0, 0.18];
 
-function extrudeLetter(shape: THREE.Shape) {
+function extrudeLetter(shape: THREE.Shape, lowPower: boolean) {
   const geometry = new THREE.ExtrudeGeometry(shape, {
     depth: 0.42,
     bevelEnabled: true,
-    bevelSegments: 16,
+    bevelSegments: lowPower ? 8 : 16,
     bevelSize: 0.065,
     bevelThickness: 0.07,
-    curveSegments: 32,
+    curveSegments: lowPower ? 20 : 32,
   });
   geometry.computeVertexNormals();
   return geometry;
@@ -221,32 +224,34 @@ function createCardTitleTexture() {
   return texture;
 }
 
-function createLedScreenMaterial(textTexture: THREE.CanvasTexture, introTexture: THREE.CanvasTexture, reflections: THREE.CanvasTexture[], titleTexture: THREE.CanvasTexture) {
+function createLedUniforms(textTexture: THREE.CanvasTexture, introTexture: THREE.CanvasTexture, reflections: THREE.CanvasTexture[], titleTexture: THREE.CanvasTexture) {
+  return {
+    uTime: { value: 0 },
+    uFlickerTime: { value: 0 },
+    uEffectTime: { value: 0 },
+    uLedText: { value: textTexture },
+    uIntroText: { value: introTexture },
+    uSceneActive: { value: 0 },
+    uCardReflectionBlend: { value: 0 },
+    uCardReflectionPhase: { value: 0 },
+    uCardReflection0: { value: reflections[0] },
+    uCardReflection1: { value: reflections[1] },
+    uCardReflection2: { value: reflections[2] },
+    uCardReflection3: { value: reflections[3] },
+    uCardTitles: { value: titleTexture },
+    uCardTitleColors: { value: Array.from({ length: 4 }, () => new THREE.Vector3(1, 1, 1)) },
+    uAccentCells: { value: Array.from({ length: 5 }, () => new THREE.Vector2()) },
+  };
+}
+
+// Everything on the LED wall is constant per LED, so it is computed once per LED into a
+// 1080x210 texture instead of once per screen pixel. `base` is the unlit cell colour and
+// `emission` is the light of the LED itself; the wall shader only draws the dot pattern.
+function createLedContentMaterial(uniforms: ReturnType<typeof createLedUniforms>, output: 'base' | 'emission', vertexShader: string) {
   return new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uFlickerTime: { value: 0 },
-      uEffectTime: { value: 0 },
-      uLedText: { value: textTexture },
-      uIntroText: { value: introTexture },
-      uSceneActive: { value: 0 },
-      uCardReflectionBlend: { value: 0 },
-      uCardReflectionPhase: { value: 0 },
-      uCardReflection0: { value: reflections[0] },
-      uCardReflection1: { value: reflections[1] },
-      uCardReflection2: { value: reflections[2] },
-      uCardReflection3: { value: reflections[3] },
-      uCardTitles: { value: titleTexture },
-      uCardTitleColors: { value: Array.from({ length: 4 }, () => new THREE.Vector3(1, 1, 1)) },
-      uAccentCells: { value: Array.from({ length: 5 }, () => new THREE.Vector2()) },
-    },
-    vertexShader: `
-      varying vec2 vScreenUv;
-      void main() {
-        vScreenUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
+    uniforms,
+    defines: output === 'base' ? { LED_BASE: '' } : {},
+    vertexShader,
     fragmentShader: `
       uniform float uTime;
       uniform float uFlickerTime;
@@ -263,7 +268,7 @@ function createLedScreenMaterial(textTexture: THREE.CanvasTexture, introTexture:
       uniform sampler2D uCardTitles;
       uniform vec3 uCardTitleColors[4];
       uniform vec2 uAccentCells[5];
-      varying vec2 vScreenUv;
+      varying vec2 vUv;
       float diagonalTitle(float index, float line, vec2 wallUv) {
         vec2 wall = vec2((0.5 - wallUv.x) * 2.2 + 0.5, wallUv.y) - 0.5;
         vec2 direction = normalize(vec2(1.0, 0.36));
@@ -276,6 +281,7 @@ function createLedScreenMaterial(textTexture: THREE.CanvasTexture, introTexture:
       vec3 reflectedCard(sampler2D image, float index, vec2 wallUv) {
         float phase = clamp(uCardReflectionPhase, 0.0, 3.0);
         float weight = max(0.0, 1.0 - abs(phase - index));
+        if (weight <= 0.0) return vec3(0.0);
         vec2 imageUv = vec2((0.5 - wallUv.x) * 2.2 + 0.5 + (phase - index) * 0.06, wallUv.y);
         vec3 color = texture2D(image, clamp(imageUv, vec2(0.001), vec2(0.999))).rgb;
         vec3 tint = (texture2D(image, vec2(0.25, 0.25)).rgb + texture2D(image, vec2(0.75, 0.25)).rgb
@@ -298,19 +304,9 @@ function createLedScreenMaterial(textTexture: THREE.CanvasTexture, introTexture:
         );
       }
       void main() {
-        vec2 ledGrid = vScreenUv * vec2(36.0 * 30.0, 7.0 * 30.0);
-        vec2 ledPosition = fract(ledGrid) - 0.5;
-        float led = 1.0 - smoothstep(0.28, 0.44, length(ledPosition));
-        float row = floor(vScreenUv.y * 7.0);
-        float direction = mod(row, 2.0) < 1.0 ? 1.0 : -1.0;
-        float diagonalStagger = row * 0.075;
-        float textScroll = direction * uTime + diagonalStagger;
-        vec2 textUv = vec2(fract(1.0 - vScreenUv.x + textScroll), vScreenUv.y);
-        float textPixel = mix(texture2D(uIntroText, textUv).r, texture2D(uLedText, textUv).r, uSceneActive);
-        vec2 cellUv = fract(vScreenUv * vec2(36.0, 7.0));
-        vec2 ledCell = floor(vScreenUv * vec2(36.0, 7.0));
-        float cellInterior = step(0.035, cellUv.x) * step(cellUv.x, 0.965)
-          * step(0.035, cellUv.y) * step(cellUv.y, 0.965);
+        // vUv sits on the centre of one LED.
+        vec2 ledGrid = vUv * vec2(${LED_COLUMNS}.0, ${LED_ROWS}.0);
+        vec2 ledCell = floor(vUv * vec2(36.0, 7.0));
         float backgroundStep = floor(uEffectTime / 5.0);
         float backgroundBlend = smoothstep(0.0, 0.8, mod(uEffectTime, 5.0));
         vec3 screenBase = mix(
@@ -319,51 +315,95 @@ function createLedScreenMaterial(textTexture: THREE.CanvasTexture, introTexture:
           backgroundBlend
         );
         screenBase = mix(vec3(0.012, 0.012, 0.014), screenBase, uSceneActive);
-        vec3 whiteText = vec3(1.35) * textPixel;
         float selectedCell = 0.0;
         for (int i = 0; i < 5; i++) {
           float accentCell = 1.0 - step(0.5, max(abs(ledCell.x - uAccentCells[i].x), abs(ledCell.y - uAccentCells[i].y)));
           selectedCell += accentCell;
         }
         selectedCell *= uSceneActive * (1.0 - uCardReflectionBlend);
-        float flickerPhase = dot(ledCell, vec2(0.37, 0.61));
-        float flicker = mod(floor(uFlickerTime * 4.0 + flickerPhase), 2.0);
-        vec2 reflectionUv = (floor(ledGrid) + 0.5) / vec2(1080.0, 210.0);
-        vec3 reflection = reflectedCard(uCardReflection0, 0.0, reflectionUv)
-          + reflectedCard(uCardReflection1, 1.0, reflectionUv)
-          + reflectedCard(uCardReflection2, 2.0, reflectionUv)
-          + reflectedCard(uCardReflection3, 3.0, reflectionUv);
-        screenBase = mix(screenBase, reflection * 0.085, uCardReflectionBlend);
-        vec3 emission = whiteText * (1.0 - uCardReflectionBlend)
-          + reflection * uCardReflectionBlend * 0.75;
-        for (int title = 0; title < 4; title++) {
-          float weight = max(0.0, 1.0 - abs(clamp(uCardReflectionPhase, 0.0, 3.0) - float(title)));
-          float lettering = diagonalTitle(float(title), 0.0, reflectionUv) + diagonalTitle(float(title), 1.0, reflectionUv);
-          emission += uCardTitleColors[title] * lettering * weight * uCardReflectionBlend * 1.3;
+        vec3 reflection = vec3(0.0);
+        if (uCardReflectionBlend > 0.0) {
+          reflection = reflectedCard(uCardReflection0, 0.0, vUv)
+            + reflectedCard(uCardReflection1, 1.0, vUv)
+            + reflectedCard(uCardReflection2, 2.0, vUv)
+            + reflectedCard(uCardReflection3, 3.0, vUv);
         }
-        vec3 cellColor = mix(screenBase + emission * led, vec3(0.8) * flicker * led, selectedCell);
-        vec2 screenPosition = (floor(ledGrid) + 0.5) / 30.0;
         float snakeMask = 0.0;
-        if (uSceneActive > 0.001) {
-        for (int snakeIndex = 0; snakeIndex < 2; snakeIndex++) {
-          float phase = snakeIndex == 0 ? uEffectTime * 0.65 : uEffectTime * 0.57 + 4.2;
-          vec2 previousPoint = snakePath(phase);
-          for (int segment = 1; segment <= 28; segment++) {
-            float trail = float(segment) / 28.0;
-            vec2 nextPoint = snakePath(phase - trail * 2.5);
-            vec2 segmentVector = nextPoint - previousPoint;
-            float projection = clamp(dot(screenPosition - previousPoint, segmentVector)
-              / max(dot(segmentVector, segmentVector), 0.0001), 0.0, 1.0);
-            float distanceToSnake = length(screenPosition - previousPoint - segmentVector * projection);
-            float thickness = mix(0.28, 0.055, trail);
-            snakeMask = max(snakeMask, 1.0 - smoothstep(thickness, thickness + 0.035, distanceToSnake));
-            previousPoint = nextPoint;
+        if (uSceneActive > 0.001 && uCardReflectionBlend < 0.999) {
+          vec2 screenPosition = ledGrid / 30.0;
+          for (int snakeIndex = 0; snakeIndex < 2; snakeIndex++) {
+            float phase = snakeIndex == 0 ? uEffectTime * 0.65 : uEffectTime * 0.57 + 4.2;
+            vec2 previousPoint = snakePath(phase);
+            for (int segment = 1; segment <= 28; segment++) {
+              float trail = float(segment) / 28.0;
+              vec2 nextPoint = snakePath(phase - trail * 2.5);
+              vec2 segmentVector = nextPoint - previousPoint;
+              float projection = clamp(dot(screenPosition - previousPoint, segmentVector)
+                / max(dot(segmentVector, segmentVector), 0.0001), 0.0, 1.0);
+              float distanceToSnake = length(screenPosition - previousPoint - segmentVector * projection);
+              float thickness = mix(0.28, 0.055, trail);
+              snakeMask = max(snakeMask, 1.0 - smoothstep(thickness, thickness + 0.035, distanceToSnake));
+              previousPoint = nextPoint;
+            }
           }
         }
-        }
-        cellColor *= 1.0 - snakeMask * uSceneActive * (1.0 - uCardReflectionBlend);
-        vec3 color = mix(vec3(0.0), cellColor, cellInterior);
-        gl_FragColor = vec4(color, 1.0);
+        float snakeFactor = 1.0 - snakeMask * uSceneActive * (1.0 - uCardReflectionBlend);
+        #ifdef LED_BASE
+          screenBase = mix(screenBase, reflection * 0.085, uCardReflectionBlend);
+          gl_FragColor = vec4(screenBase * (1.0 - selectedCell) * snakeFactor, 1.0);
+        #else
+          float row = floor(vUv.y * 7.0);
+          float direction = mod(row, 2.0) < 1.0 ? 1.0 : -1.0;
+          float textScroll = direction * uTime + row * 0.075;
+          vec2 textUv = vec2(fract(1.0 - vUv.x + textScroll), vUv.y);
+          float textPixel = mix(texture2D(uIntroText, textUv).r, texture2D(uLedText, textUv).r, uSceneActive);
+          vec3 emission = vec3(1.35) * textPixel * (1.0 - uCardReflectionBlend)
+            + reflection * uCardReflectionBlend * 0.75;
+          if (uCardReflectionBlend > 0.0) {
+            for (int title = 0; title < 4; title++) {
+              float weight = max(0.0, 1.0 - abs(clamp(uCardReflectionPhase, 0.0, 3.0) - float(title)));
+              if (weight <= 0.0) continue;
+              float lettering = diagonalTitle(float(title), 0.0, vUv) + diagonalTitle(float(title), 1.0, vUv);
+              emission += uCardTitleColors[title] * lettering * weight * uCardReflectionBlend * 1.3;
+            }
+          }
+          float flicker = mod(floor(uFlickerTime * 4.0 + dot(ledCell, vec2(0.37, 0.61))), 2.0);
+          gl_FragColor = vec4(mix(emission, vec3(0.8 * flicker), selectedCell) * snakeFactor, 1.0);
+        #endif
+      }
+    `,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+}
+
+function createLedScreenMaterial(base: THREE.Texture, emission: THREE.Texture) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uLedBase: { value: base },
+      uLedEmission: { value: emission },
+    },
+    vertexShader: `
+      varying vec2 vScreenUv;
+      void main() {
+        vScreenUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uLedBase;
+      uniform sampler2D uLedEmission;
+      varying vec2 vScreenUv;
+      void main() {
+        vec2 ledGrid = vScreenUv * vec2(${LED_COLUMNS}.0, ${LED_ROWS}.0);
+        float led = 1.0 - smoothstep(0.28, 0.44, length(fract(ledGrid) - 0.5));
+        vec2 cellUv = fract(vScreenUv * vec2(36.0, 7.0));
+        float cellInterior = step(0.035, cellUv.x) * step(cellUv.x, 0.965)
+          * step(0.035, cellUv.y) * step(cellUv.y, 0.965);
+        vec2 ledUv = (floor(ledGrid) + 0.5) / vec2(${LED_COLUMNS}.0, ${LED_ROWS}.0);
+        vec3 color = texture2D(uLedBase, ledUv).rgb + texture2D(uLedEmission, ledUv).rgb * led;
+        gl_FragColor = vec4(color * cellInterior, 1.0);
         #include <colorspace_fragment>
       }
     `,
@@ -419,6 +459,10 @@ export default function BrandScene() {
     const host = hostRef.current;
     if (!host) return;
     const nativeTouchScrolling = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+    // Phones, tablets and weak machines get a lighter scene from the start; the frame-time
+    // monitor below lowers the render resolution further if a device still can't keep up.
+    const lowPower = nativeTouchScrolling || (navigator.hardwareConcurrency || 8) <= 4 || deviceMemory <= 4;
     const loaderSafetyTimeout = window.setTimeout(() => {
       sceneReadyRef.current = true;
       setSceneReady(true);
@@ -426,7 +470,8 @@ export default function BrandScene() {
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
+      // The canvas only receives the finished composite, so it needs no MSAA, depth or stencil buffer.
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: false, depth: false, stencil: false, powerPreference: 'default' });
     } catch {
       const fallbackFrame = window.requestAnimationFrame(() => {
         sceneReadyRef.current = true;
@@ -446,17 +491,19 @@ export default function BrandScene() {
     scene.environment = environmentTarget.texture;
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 30);
     camera.position.set(0, 0, 6.4);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3));
+    renderer.setPixelRatio(1);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
     host.appendChild(renderer.domElement);
+    // The glass only sees the background through heavy distortion, so a reduced-size copy of
+    // the already rendered background is enough; the scene is no longer rendered twice.
     const refractionTarget = new THREE.WebGLRenderTarget(1, 1, {
       format: THREE.RGBAFormat,
       type: THREE.UnsignedByteType,
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
-      depthBuffer: true,
+      depthBuffer: false,
       stencilBuffer: false,
     });
     refractionTarget.texture.generateMipmaps = false;
@@ -464,9 +511,17 @@ export default function BrandScene() {
     const floatTargets = renderer.extensions.has('EXT_color_buffer_float');
     const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
       type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
-      samples: nativeTouchScrolling ? 0 : Math.min(4, renderer.capabilities.maxSamples),
+      samples: lowPower ? 0 : Math.min(4, renderer.capabilities.maxSamples),
       depthBuffer: true,
     });
+    const ledContentTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(LED_COLUMNS, LED_ROWS, {
+      type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      depthBuffer: false,
+      stencilBuffer: false,
+    }));
+    ledContentTargets.forEach((target) => { target.texture.generateMipmaps = false; });
     const waveTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(1, 1, {
       type: THREE.HalfFloatType,
       minFilter: THREE.LinearFilter,
@@ -554,6 +609,20 @@ export default function BrandScene() {
       depthWrite: false,
       toneMapped: false,
     });
+    const copyMaterial = new THREE.ShaderMaterial({
+      uniforms: { uSource: { value: sceneTarget.texture } },
+      vertexShader: postVertexShader,
+      fragmentShader: `
+        uniform sampler2D uSource;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = texture2D(uSource, vUv);
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
     const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), compositeMaterial);
     postQuad.frustumCulled = false;
     postScene.add(postQuad);
@@ -566,8 +635,14 @@ export default function BrandScene() {
     let waveAccumulator = 0;
     let waveForce = 0;
     let wavePointerActive = false;
-    const stepWaves = (delta: number) => {
-      if (!floatTargets) return;
+    // The ripple simulation only runs while the mouse has recently disturbed it; afterwards it
+    // has decayed to nothing and stepping it would be wasted work.
+    let waveActiveUntil = 0;
+    const stepWaves = (delta: number, time: number) => {
+      if (!floatTargets || time > waveActiveUntil) {
+        waveAccumulator = 0;
+        return;
+      }
       waveAccumulator = Math.min(waveAccumulator + delta, 0.05);
       postQuad.material = waveMaterial;
       while (waveAccumulator >= 1 / 60) {
@@ -595,9 +670,20 @@ export default function BrandScene() {
     const ledIntroTexture = createLedTextTexture(['SOFTWARE DEVELOPER', 'FOUNDER', 'STUDENT', 'LEADER', 'FINANCE']);
     const ledReflectionTextures = Array.from({ length: 4 }, () => createLedReflectionTexture());
     const cardTitleTexture = createCardTitleTexture();
-    const ledScreenMaterial = createLedScreenMaterial(ledTextTexture, ledIntroTexture, ledReflectionTextures, cardTitleTexture);
-    const cardTitleColors = ledScreenMaterial.uniforms.uCardTitleColors.value as THREE.Vector3[];
-    const ledAccentCells = ledScreenMaterial.uniforms.uAccentCells.value as THREE.Vector2[];
+    const ledUniforms = createLedUniforms(ledTextTexture, ledIntroTexture, ledReflectionTextures, cardTitleTexture);
+    const ledContentMaterials = (['base', 'emission'] as const)
+      .map((output) => createLedContentMaterial(ledUniforms, output, postVertexShader));
+    const ledScreenMaterial = createLedScreenMaterial(ledContentTargets[0].texture, ledContentTargets[1].texture);
+    const renderLedContent = () => {
+      ledContentMaterials.forEach((material, index) => {
+        postQuad.material = material;
+        renderer.setRenderTarget(ledContentTargets[index]);
+        renderer.render(postScene, postCamera);
+      });
+      postQuad.material = compositeMaterial;
+    };
+    const cardTitleColors = ledUniforms.uCardTitleColors.value;
+    const ledAccentCells = ledUniforms.uAccentCells.value;
     randomizeLedCells(ledAccentCells);
     let nextLedColorChange = performance.now() + 3000;
     const ledScreen = new THREE.Mesh(
@@ -611,7 +697,7 @@ export default function BrandScene() {
     const panatMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uWordmark: { value: panatTexture },
-        uDissolve: ledScreenMaterial.uniforms.uSceneActive,
+        uDissolve: ledUniforms.uSceneActive,
       },
       vertexShader: `
         varying vec2 vWordmarkUv;
@@ -764,10 +850,10 @@ export default function BrandScene() {
     group.add(monogram);
     const letterPShape = createLetterP();
     const letterRShape = createLetterR();
-    const letterP = new THREE.Mesh(extrudeLetter(letterPShape), glassMaterial);
+    const letterP = new THREE.Mesh(extrudeLetter(letterPShape, lowPower), glassMaterial);
     letterP.position.x = -1.42;
     monogram.add(letterP);
-    const letterR = new THREE.Mesh(extrudeLetter(letterRShape), glassMaterial);
+    const letterR = new THREE.Mesh(extrudeLetter(letterRShape, lowPower), glassMaterial);
     letterR.position.x = 0.42;
     monogram.add(letterR);
 
@@ -796,6 +882,10 @@ export default function BrandScene() {
     limeSoftbox.position.set(0, -3.4, 2.2);
     limeSoftbox.lookAt(0, 0, 0);
     scene.add(limeSoftbox);
+    const linearChannels = Float32Array.from({ length: 256 }, (_, value) => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
     const readTextPixels = (texture: THREE.CanvasTexture) => {
       const canvas = texture.image as HTMLCanvasElement;
       return canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -804,29 +894,43 @@ export default function BrandScene() {
     const introPixels = readTextPixels(ledIntroTexture);
     const titlePixels = readTextPixels(cardTitleTexture);
     const reflectionPixels = ledReflectionTextures.map(readTextPixels);
-    const linearChannels = Float32Array.from({ length: 256 }, (_, value) => {
-      const channel = value / 255;
-      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-    });
+    // Average colour of each blurred card reflection, sampled like the shader's tint (linear RGB).
+    const reflectionTints = new Float32Array(12);
+    const updateReflectionTint = (index: number) => {
+      const pixels = reflectionPixels[index];
+      reflectionTints.fill(0, index * 3, index * 3 + 3);
+      if (!pixels) return;
+      for (const vertical of [0.25, 0.75]) {
+        for (const horizontal of [0.25, 0.75]) {
+          const pixel = (Math.floor((1 - vertical) * REFLECTION_HEIGHT) * REFLECTION_WIDTH + Math.floor(horizontal * REFLECTION_WIDTH)) * 4;
+          for (let channel = 0; channel < 3; channel += 1) {
+            reflectionTints[index * 3 + channel] += linearChannels[pixels[pixel + channel]] * 0.25;
+          }
+        }
+      }
+    };
     const snakePaths = Array.from({ length: 2 }, () => Array.from({ length: 29 }, () => new THREE.Vector2()));
     const sampleColor = new THREE.Vector3();
-    const textLights = Array.from({ length: 7 }, () => {
+    // These lights mirror the moving LED text onto the glass. They are the most expensive part of
+    // the glass shader and need per-frame CPU sampling, so low-power devices skip them.
+    const textLights = Array.from({ length: lowPower ? 0 : 7 }, () => {
       const light = new THREE.RectAreaLight(0xffffff, 0, 1.3, 1.05);
       scene.add(light);
       return light;
     });
-    const flickerLights = ledAccentCells.map(() => {
+    const flickerLights = (lowPower ? [] : ledAccentCells).map(() => {
       const light = new THREE.RectAreaLight(0xffffff, 0, 1.15, 1.15);
       scene.add(light);
       return light;
     });
     const updateLedLighting = () => {
-      const textTime = ledScreenMaterial.uniforms.uTime.value as number;
-      const flickerTime = ledScreenMaterial.uniforms.uFlickerTime.value as number;
-      const sceneBlend = ledScreenMaterial.uniforms.uSceneActive.value as number;
-      const reflectionBlend = ledScreenMaterial.uniforms.uCardReflectionBlend.value as number;
-      const reflectionPhase = ledScreenMaterial.uniforms.uCardReflectionPhase.value as number;
-      const effectTime = ledScreenMaterial.uniforms.uEffectTime.value as number;
+      if (lowPower) return;
+      const textTime = ledUniforms.uTime.value as number;
+      const flickerTime = ledUniforms.uFlickerTime.value as number;
+      const sceneBlend = ledUniforms.uSceneActive.value as number;
+      const reflectionBlend = ledUniforms.uCardReflectionBlend.value as number;
+      const reflectionPhase = ledUniforms.uCardReflectionPhase.value as number;
+      const effectTime = ledUniforms.uEffectTime.value as number;
       if (sceneBlend > 0 && reflectionBlend < 1) {
         snakePaths.forEach((path, index) => {
           const head = index === 0 ? effectTime * 0.65 : effectTime * 0.57 + 4.2;
@@ -851,12 +955,9 @@ export default function BrandScene() {
             if (!pixels || weight === 0) return;
             const imagePixel = (THREE.MathUtils.clamp(Math.floor((1 - verticalUv) * REFLECTION_HEIGHT), 0, REFLECTION_HEIGHT - 1) * REFLECTION_WIDTH
               + THREE.MathUtils.clamp(Math.floor(horizontalUv * REFLECTION_WIDTH), 0, REFLECTION_WIDTH - 1)) * 4;
-            const tintPixels = [0.25, 0.75].flatMap((vertical) => [0.25, 0.75].map((horizontal) =>
-              (Math.floor((1 - vertical) * REFLECTION_HEIGHT) * REFLECTION_WIDTH + Math.floor(horizontal * REFLECTION_WIDTH)) * 4));
-            const tint = (channel: number) => tintPixels.reduce((sum, pixelIndex) => sum + linearChannels[pixels[pixelIndex + channel]], 0) * 0.25;
-            const red = linearChannels[pixels[imagePixel]] * 0.78 + tint(0) * 0.22;
-            const green = linearChannels[pixels[imagePixel + 1]] * 0.78 + tint(1) * 0.22;
-            const blue = linearChannels[pixels[imagePixel + 2]] * 0.78 + tint(2) * 0.22;
+            const red = linearChannels[pixels[imagePixel]] * 0.78 + reflectionTints[index * 3] * 0.22;
+            const green = linearChannels[pixels[imagePixel + 1]] * 0.78 + reflectionTints[index * 3 + 1] * 0.22;
+            const blue = linearChannels[pixels[imagePixel + 2]] * 0.78 + reflectionTints[index * 3 + 2] * 0.22;
             const luminance = red * 0.2126 + green * 0.7152 + blue * 0.0722;
             const strength = weight * reflectionBlend * 0.75;
             sampleColor.x += (luminance * 0.25 + red * 0.75) * strength;
@@ -886,7 +987,8 @@ export default function BrandScene() {
         const cellRow = Math.floor(vertical * 7);
         if (ledAccentCells.some((cell) => cell.x === column && cell.y === cellRow)) {
           const flash = THREE.MathUtils.euclideanModulo(Math.floor(flickerTime * 4 + column * 0.37 + cellRow * 0.61), 2);
-          sampleColor.lerp(new THREE.Vector3().setScalar(flash * 0.8), sceneBlend * (1 - reflectionBlend));
+          const accent = sceneBlend * (1 - reflectionBlend);
+          sampleColor.multiplyScalar(1 - accent).addScalar(flash * 0.8 * accent);
         }
         if (sceneBlend > 0 && reflectionBlend < 1) {
           const horizontalPosition = (Math.floor(horizontal * 1080) + 0.5) / 30;
@@ -919,7 +1021,7 @@ export default function BrandScene() {
         const direction = row % 2 === 0 ? 1 : -1;
         for (let column = 10; column < 26; column += 1) {
           let emission = 0;
-          for (const offset of [-0.18, 0, 0.18]) {
+          for (const offset of SAMPLE_OFFSETS) {
             const horizontal = (column + 0.5) / 36;
             const vertical = (row + 0.5 + offset) / 7;
             const color = sampleEmission(horizontal, vertical, row, direction);
@@ -953,7 +1055,7 @@ export default function BrandScene() {
     const prRadius = (prEnvelope.radius + prEnvelope.center.length()) / monogram.scale.x;
     const cardAspect = 1672 / 941;
     const cardHeight = 4 / cardAspect;
-    const cardGeometry = new THREE.PlaneGeometry(4, cardHeight, 64, 16);
+    const cardGeometry = new THREE.PlaneGeometry(4, cardHeight, 64, 1);
     const cardPositions = cardGeometry.getAttribute('position');
     for (let vertex = 0; vertex < cardPositions.count; vertex += 1) {
       const horizontal = cardPositions.getX(vertex);
@@ -1040,6 +1142,7 @@ export default function BrandScene() {
         ledReflectionTextures[index].dispose();
         ledReflectionTextures[index] = reflection;
         reflectionPixels[index] = readTextPixels(reflection);
+        updateReflectionTint(index);
         const pixels = reflectionPixels[index];
         if (pixels) {
           let red = 0;
@@ -1055,7 +1158,7 @@ export default function BrandScene() {
           const peak = Math.max(red, green, blue);
           if (peak > 0.001) cardTitleColors[index].set(0.25 + red / peak * 0.75, 0.25 + green / peak * 0.75, 0.25 + blue / peak * 0.75);
         }
-        ledScreenMaterial.uniforms[`uCardReflection${index}`].value = reflection;
+        (ledUniforms as Record<string, THREE.IUniform>)[`uCardReflection${index}`].value = reflection;
         renderWithRefraction();
       });
       texture.colorSpace = THREE.SRGBColorSpace;
@@ -1069,18 +1172,38 @@ export default function BrandScene() {
     cardGroup.visible = false;
     cardScene.add(cardGroup);
 
+    const backdrop = [ledScreen, roomGrid, panatWordmark];
+    let lightingUpdatedAt = -Infinity;
+    let shadersReady = false;
     const renderWithRefraction = () => {
-      updateLedLighting();
+      if (!shadersReady) return;
+      // The LED lights only follow slow text movement, so 30 updates per second are plenty.
+      const now = performance.now();
+      if (now - lightingUpdatedAt > 30) {
+        lightingUpdatedAt = now;
+        updateLedLighting();
+      }
+      renderLedContent();
+      // 1. Background (LED wall, grid, wordmark) once at full resolution.
       group.visible = false;
-      renderer.setRenderTarget(refractionTarget);
-      renderer.clear(true, true, true);
-      renderer.render(scene, camera);
-      group.visible = true;
       renderer.setRenderTarget(sceneTarget);
       renderer.clear(true, true, true);
       renderer.render(scene, camera);
+      // 2. Reduced copy of it, which the glass refracts.
+      postQuad.material = copyMaterial;
+      renderer.setRenderTarget(refractionTarget);
+      renderer.render(postScene, postCamera);
+      // 3. The glass monogram on top of the background that is already in the target.
+      group.visible = true;
+      backdrop.forEach((object) => { object.visible = false; });
+      renderer.setRenderTarget(sceneTarget);
+      renderer.autoClear = false;
+      renderer.render(scene, camera);
+      renderer.autoClear = true;
+      backdrop.forEach((object) => { object.visible = true; });
+      // 4. Composite with the ripple distortion, then the cards straight onto the canvas.
+      postQuad.material = compositeMaterial;
       renderer.setRenderTarget(null);
-      renderer.clear(true, true, true);
       renderer.render(postScene, postCamera);
       if (cardGroup.visible) {
         renderer.autoClear = false;
@@ -1089,21 +1212,38 @@ export default function BrandScene() {
       }
     };
 
+    // Like alche.studio: never render above 1.5x device pixels, keep a total pixel budget, and let
+    // the frame-time monitor scale the resolution down on devices that still can't keep up.
+    const maxPixelRatio = 1.5;
+    const pixelBudget = nativeTouchScrolling ? 900_000 : lowPower ? 1_600_000 : 3_200_000;
+    let qualityScale = 1;
+    let viewportWidth = 1;
+    let viewportHeight = window.innerHeight;
+    // Scroll progress is measured against the sticky hero's height and the section's document
+    // offset, both cached on resize so the frame loop never forces a layout read.
+    const heroContainer = host.closest('.home');
+    let homeTop = (heroContainer?.getBoundingClientRect().top ?? 0) + window.scrollY;
+    const applyResolution = () => {
+      const ratio = Math.min(window.devicePixelRatio, maxPixelRatio, Math.sqrt(pixelBudget / (viewportWidth * viewportHeight)));
+      renderer.setPixelRatio(ratio * qualityScale);
+      renderer.setSize(viewportWidth, viewportHeight, false);
+      renderer.getDrawingBufferSize(refractionResolution);
+      sceneTarget.setSize(refractionResolution.x, refractionResolution.y);
+      refractionTarget.setSize(Math.ceil(refractionResolution.x / 2), Math.ceil(refractionResolution.y / 2));
+    };
     const resizeObserver = new ResizeObserver(() => {
       const { width, height } = host.getBoundingClientRect();
       if (!width || !height) return;
+      viewportWidth = width;
+      viewportHeight = height;
+      homeTop = (heroContainer?.getBoundingClientRect().top ?? 0) + window.scrollY;
       camera.aspect = width / height;
       camera.position.z = width < 600 ? 7.8 : 6.4;
       const visibleWidth = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
       monogram.scale.setScalar(Math.min(0.78, visibleWidth * 0.9 / 4.12));
       panatWordmark.scale.setScalar(Math.min(1, visibleWidth * (camera.position.z + 1.3) / camera.position.z * 1.18 / 9.2));
       camera.updateProjectionMatrix();
-      const pixelBudget = nativeTouchScrolling ? 1_800_000 : 4_000_000;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3, Math.sqrt(pixelBudget / (width * height))));
-      renderer.setSize(width, height, false);
-      renderer.getDrawingBufferSize(refractionResolution);
-      refractionTarget.setSize(refractionResolution.x, refractionResolution.y);
-      sceneTarget.setSize(refractionResolution.x, refractionResolution.y);
+      applyResolution();
       const waveHeight = Math.max(1, Math.round(200 * height / width));
       waveTargets.forEach((target) => target.setSize(200, waveHeight));
       waveTexel.set(1 / 200, 1 / waveHeight);
@@ -1221,7 +1361,6 @@ export default function BrandScene() {
     const onPointerUp = (event: PointerEvent) => {
       if (event.pointerId === dragPointerId) endDrag();
     };
-    const heroContainer = host.closest('.home');
     const transitionEnd = 0.2;
     const cardStops = [1.5, 2.2, 3.2, 4.2, 5.2, 6.2, 7.8];
     const outroGrowStart = 6.6;
@@ -1230,6 +1369,9 @@ export default function BrandScene() {
     const snapRanges = [[0, transitionEnd], ...cardStops.slice(0, -1).map((start, index) => [start, cardStops[index + 1]])];
     const cardActions = Array.from(host.closest('.hero')?.querySelectorAll<HTMLElement>('.hero-card-action') ?? []);
     const actionPosition = new THREE.Vector3();
+    const cardPoint = new THREE.Vector3();
+    const cardOrientation = new THREE.Matrix4();
+    const actionStates = cardActions.map(() => ({ hidden: true, transform: '' }));
     const updateCards = () => {
       const firstEntry = THREE.MathUtils.smoothstep(scrollProgress, 1.5, 2.2);
       const exit = THREE.MathUtils.smoothstep(scrollProgress, 5.2, 6.2);
@@ -1237,8 +1379,8 @@ export default function BrandScene() {
         + THREE.MathUtils.smoothstep(scrollProgress, 3.2, 4.2)
         + THREE.MathUtils.smoothstep(scrollProgress, 4.2, 5.2)
         + exit * 1.4;
-      ledScreenMaterial.uniforms.uCardReflectionBlend.value = firstEntry * (1 - THREE.MathUtils.smoothstep(scrollProgress, 5.5, 6.2));
-      ledScreenMaterial.uniforms.uCardReflectionPhase.value = Math.min(cardPhase, 3) + firstEntry - 1;
+      ledUniforms.uCardReflectionBlend.value = firstEntry * (1 - THREE.MathUtils.smoothstep(scrollProgress, 5.5, 6.2));
+      ledUniforms.uCardReflectionPhase.value = Math.min(cardPhase, 3) + firstEntry - 1;
       const fieldOfView = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const prFrontLimit = prRadius * monogram.scale.x + 0.12;
       const frontDepth = prFrontLimit + 0.65;
@@ -1257,8 +1399,8 @@ export default function BrandScene() {
         card.position.set(radius * Math.sin(angle), visibleHeight * 0.15 * Math.sin(angle),
           frontDepth - radius * 0.65 * (1 - Math.cos(angle)));
         card.rotation.set(0, angle * 0.55, -angle * 0.06);
-        const orientation = new THREE.Matrix4().makeRotationFromEuler(card.rotation);
-        const point = new THREE.Vector3();
+        const orientation = cardOrientation.makeRotationFromEuler(card.rotation);
+        const point = cardPoint;
         let minimumDepth = 0;
         for (let vertex = 0; vertex < cardPositions.count; vertex += 1) {
           point.fromBufferAttribute(cardPositions, vertex).multiplyScalar(scale).applyMatrix4(orientation);
@@ -1284,12 +1426,21 @@ export default function BrandScene() {
         const action = cardActions[index];
         if (action) {
           actionPosition.set(0, -cardHeight / 2 - 0.16, 0).applyMatrix4(card.matrixWorld).project(camera);
-          const horizontal = (actionPosition.x * 0.5 + 0.5) * host.clientWidth;
-          const vertical = (-actionPosition.y * 0.5 + 0.5) * host.clientHeight;
-          action.hidden = !cardGroup.visible || !card.visible || actionPosition.z < -1 || actionPosition.z > 1
-            || horizontal < 80 || horizontal > host.clientWidth - 80 || vertical < 0 || vertical > host.clientHeight - 50;
-          action.style.left = `${horizontal}px`;
-          action.style.top = `${vertical}px`;
+          const horizontal = (actionPosition.x * 0.5 + 0.5) * viewportWidth;
+          const vertical = (-actionPosition.y * 0.5 + 0.5) * viewportHeight;
+          const hidden = !cardGroup.visible || !card.visible || actionPosition.z < -1 || actionPosition.z > 1
+            || horizontal < 80 || horizontal > viewportWidth - 80 || vertical < 0 || vertical > viewportHeight - 50;
+          // Only touch the DOM when something changed, and move with a composited transform.
+          const state = actionStates[index];
+          if (hidden !== state.hidden) {
+            state.hidden = hidden;
+            action.hidden = hidden;
+          }
+          const transform = `translate3d(${horizontal.toFixed(1)}px, ${vertical.toFixed(1)}px, 0) translateX(-50%)`;
+          if (!hidden && transform !== state.transform) {
+            state.transform = transform;
+            action.style.transform = transform;
+          }
         }
       });
       const wasInCardSection = inCardSection;
@@ -1335,13 +1486,13 @@ export default function BrandScene() {
       else window.scrollTo({ top, behavior: 'instant' });
     };
     const startCardStep = (direction: number, time: number) => {
-      const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
-      const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
+      const containerTop = homeTop;
+      const current = Math.max(0, (window.scrollY - containerTop) / viewportHeight);
       const destination = direction > 0 && current < cardStops[0]
         ? cardStops[1] : getNextCardStop(current, direction, cardStops);
       if (destination === undefined) return false;
       scrollImmediately(window.scrollY);
-      snapTarget = containerTop + destination * window.innerHeight;
+      snapTarget = containerTop + destination * viewportHeight;
       cardGestureTarget = destination;
       stepDuration = Math.max(destination, current) > 6.25 ? 1500 : 650;
       snapStartPosition = window.scrollY;
@@ -1353,10 +1504,10 @@ export default function BrandScene() {
     };
     const consumeCardGesture = (movement: number, time: number, source: 'wheel' | 'touch' | 'key' = 'wheel') => {
       if (nativeTouchScrolling) return false;
-      const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
-      const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
+      const containerTop = homeTop;
+      const current = Math.max(0, (window.scrollY - containerTop) / viewportHeight);
       if (cardGestureTarget === null && current < 1.45
-        && (movement <= 0 || current + movement * 0.4 / window.innerHeight < cardStops[0])) return false;
+        && (movement <= 0 || current + movement * 0.4 / viewportHeight < cardStops[0])) return false;
       if (current > cardStops[cardStops.length - 1] + 0.01) {
         cardGestureTarget = null;
         queuedDirection = 0;
@@ -1400,7 +1551,7 @@ export default function BrandScene() {
       resetModelAtTop();
       if (event.ctrlKey || event.deltaY === 0) return;
       if (event.target instanceof Element && event.target.closest('input, textarea, select, [data-lenis-prevent]')) return;
-      const movement = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
+      const movement = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewportHeight : 1);
       if (consumeCardGesture(movement, performance.now())) {
         if (event.cancelable) event.preventDefault();
         event.stopImmediatePropagation();
@@ -1482,12 +1633,12 @@ export default function BrandScene() {
       const cardIndex = cardSlugs.indexOf(request.detail.slug);
       if (cardIndex < 0) return;
       request.preventDefault();
-      const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
-      const current = Math.max(0, (window.scrollY - containerTop) / window.innerHeight);
+      const containerTop = homeTop;
+      const current = Math.max(0, (window.scrollY - containerTop) / viewportHeight);
       const destination = 2.2 + cardIndex;
       const now = performance.now();
       scrollImmediately(window.scrollY);
-      snapTarget = containerTop + destination * window.innerHeight;
+      snapTarget = containerTop + destination * viewportHeight;
       snapStartPosition = window.scrollY;
       snapStartTangent = 0;
       snapStartedAt = now;
@@ -1499,7 +1650,7 @@ export default function BrandScene() {
       wakeRenderFrame();
     };
     function resetModelAtTop() {
-      const distance = Math.max(0, -(heroContainer?.getBoundingClientRect().top ?? 0));
+      const distance = Math.max(0, window.scrollY - homeTop);
       if (distance > 1) return;
       const needsRender = modelActive || scrollProgress !== 0 || !group.quaternion.equals(initialRotation);
       endDrag();
@@ -1526,19 +1677,19 @@ export default function BrandScene() {
       scrollRotation.set(0, 0, 0);
       outroGrow = 0;
       group.scale.setScalar(1);
-      ledScreenMaterial.uniforms.uSceneActive.value = 0;
+      ledUniforms.uSceneActive.value = 0;
       updateCards();
       if (needsRender) renderWithRefraction();
     }
     const updateModelActivation = () => {
-      const scrollDistance = Math.max(0, -(heroContainer?.getBoundingClientRect().top ?? 0));
-      const nextProgress = scrollDistance <= 1 ? 0 : scrollDistance / window.innerHeight;
+      const scrollDistance = Math.max(0, window.scrollY - homeTop);
+      const nextProgress = scrollDistance <= 1 ? 0 : scrollDistance / viewportHeight;
       if (nextProgress === 0) {
         resetModelAtTop();
         return;
       }
       if (nextProgress === scrollProgress) return;
-      scrollVelocity = (nextProgress - scrollProgress) * window.innerHeight
+      scrollVelocity = (nextProgress - scrollProgress) * viewportHeight
         / Math.max((performance.now() - lastScrollChange) / 1000, 0.016);
       if (snapTarget === null && (scrollDirection === 0 || pointerHeld || performance.now() - lastScrollInput > 120)) {
         scrollDirection = Math.sign(nextProgress - scrollProgress);
@@ -1559,7 +1710,7 @@ export default function BrandScene() {
       if (!nextActive && modelActive) endDrag();
       modelActive = nextActive;
       if (reduceMotion) {
-        ledScreenMaterial.uniforms.uSceneActive.value = sceneBlendTarget;
+        ledUniforms.uSceneActive.value = sceneBlendTarget;
         if (!modelActive) {
           manualRotation.copy(initialRotation);
           idleRotation = 0;
@@ -1608,6 +1759,7 @@ export default function BrandScene() {
       if (wavePointerActive) {
         const travel = Math.hypot((pointer.x - waveTo.x) * bounds.width / bounds.height, pointer.y - waveTo.y);
         waveForce = Math.min(waveForce + travel * 1.2, 0.06);
+        if (travel > 0) waveActiveUntil = performance.now() + 3000;
       } else {
         (waveMaterial.uniforms.uFrom.value as THREE.Vector2).copy(pointer);
         wavePointerActive = true;
@@ -1621,15 +1773,60 @@ export default function BrandScene() {
     window.addEventListener('pointermove', onParallaxMove, { passive: true });
     document.documentElement.addEventListener('mouseleave', onParallaxLeave);
     const effectStartedAt = performance.now();
+    // Frame-time monitor: if the device can't hold ~45 fps, render fewer pixels. When dropping the
+    // resolution doesn't help (30 Hz power-saving caps, CPU-bound devices) the previous size is
+    // restored and the monitor stops, so it never degrades the image for nothing.
+    const monitor = { skip: 60, samples: 0, total: 0, slowWindows: 0, pending: false, lastAverage: 0, previousScale: 1, locked: reduceMotion };
+    const monitorFrame = (interval: number) => {
+      if (monitor.locked) return;
+      if (interval > 250) {
+        monitor.samples = 0;
+        monitor.total = 0;
+        return;
+      }
+      if (monitor.skip > 0) {
+        monitor.skip -= 1;
+        return;
+      }
+      monitor.total += interval;
+      monitor.samples += 1;
+      if (monitor.samples < 40) return;
+      const average = monitor.total / monitor.samples;
+      monitor.samples = 0;
+      monitor.total = 0;
+      if (monitor.pending) {
+        monitor.pending = false;
+        if (average > monitor.lastAverage * 0.92) {
+          qualityScale = monitor.previousScale;
+          applyResolution();
+          monitor.locked = true;
+          return;
+        }
+      }
+      monitor.slowWindows = average > 22 ? monitor.slowWindows + 1 : 0;
+      if (monitor.slowWindows >= 2 && qualityScale > 0.55) {
+        monitor.slowWindows = 0;
+        monitor.pending = true;
+        monitor.lastAverage = average;
+        monitor.previousScale = qualityScale;
+        qualityScale = Math.max(0.55, qualityScale * 0.8);
+        applyResolution();
+        monitor.skip = 15;
+      }
+    };
     const renderFrame = (time: number) => {
       if (!visible || document.hidden) return;
+      if (!shadersReady) {
+        frameId = window.requestAnimationFrame(renderFrame);
+        return;
+      }
       updateModelActivation();
-      const scrollDistance = scrollProgress * window.innerHeight;
+      const scrollDistance = scrollProgress * viewportHeight;
       const snapRange = nativeTouchScrolling ? undefined : snapRanges.find(([start, end]) =>
-        scrollDistance > window.innerHeight * start + 1 && scrollDistance < window.innerHeight * end - 1);
-      const containerTop = window.scrollY + (heroContainer?.getBoundingClientRect().top ?? 0);
+        scrollDistance > viewportHeight * start + 1 && scrollDistance < viewportHeight * end - 1);
+      const containerTop = homeTop;
       const intendedProgress = smoothScroll?.current?.isScrolling === 'smooth'
-        ? (smoothScroll.current.targetScroll - containerTop) / window.innerHeight : scrollProgress;
+        ? (smoothScroll.current.targetScroll - containerTop) / viewportHeight : scrollProgress;
       if (snapTarget !== null && Math.abs(window.scrollY - snapTarget) <= 1) snapTarget = null;
       const outroStop = cardStops[cardStops.length - 1];
       // Momentum scrolling up out of the quote hands over to the outro step instead of stalling mid-transition.
@@ -1661,7 +1858,7 @@ export default function BrandScene() {
           gestureLastInput = time;
           startCardStep(endpoint > scrollProgress ? 1 : -1, time);
         } else {
-          snapTarget = containerTop + window.innerHeight * endpoint;
+          snapTarget = containerTop + viewportHeight * endpoint;
           snapStartPosition = window.scrollY;
           const distance = snapTarget - snapStartPosition;
           const velocity = smoothScroll?.current?.isScrolling === 'smooth'
@@ -1691,18 +1888,19 @@ export default function BrandScene() {
         queuedDirection = 0;
         if (cardGestureTarget !== null) startCardStep(direction, time);
       }
-      const delta = Math.min((time - previousTime) / 1000, 0.05);
+      const interval = previousTime ? time - previousTime : 0;
+      const delta = Math.min(interval / 1000, 0.05);
       previousTime = time;
       if (!reduceMotion) {
         if (time >= nextLedColorChange) {
           randomizeLedCells(ledAccentCells);
           nextLedColorChange = time + 3000;
         }
-        ledScreenMaterial.uniforms.uTime.value = time * 0.00008;
-        ledScreenMaterial.uniforms.uFlickerTime.value = time * 0.001;
-        ledScreenMaterial.uniforms.uEffectTime.value = (time - effectStartedAt) * 0.001;
+        ledUniforms.uTime.value = time * 0.00008;
+        ledUniforms.uFlickerTime.value = time * 0.001;
+        ledUniforms.uEffectTime.value = (time - effectStartedAt) * 0.001;
         const smoothing = 1 - Math.exp(-delta * 12);
-        const sceneBlend = ledScreenMaterial.uniforms.uSceneActive;
+        const sceneBlend = ledUniforms.uSceneActive;
         sceneBlend.value = THREE.MathUtils.lerp(sceneBlend.value, sceneBlendTarget, smoothing);
         if (Math.abs(sceneBlend.value - sceneBlendTarget) < 0.0001) sceneBlend.value = sceneBlendTarget;
         // Rotating the enclosing room shifts it like a distant backdrop; nearer layers translate less.
@@ -1722,10 +1920,17 @@ export default function BrandScene() {
           idleRotation *= 1 - smoothing;
         }
         updateModelRotation(smoothing);
-        stepWaves(delta);
+        stepWaves(delta, time);
       }
-      // Past this point the quote page fully covers the scene, so skip the expensive full-screen glass render.
-      if (!reduceMotion && scrollProgress < 7.72) renderWithRefraction();
+      // Past this point the quote page fully covers the scene, and while a detail sheet is open the
+      // blurred backdrop can keep showing the last frame, so both skip the WebGL work entirely.
+      const detailsOpen = document.documentElement.classList.contains('details-open');
+      if (!reduceMotion && scrollProgress < 7.72 && !detailsOpen) {
+        renderWithRefraction();
+        if (interval) monitorFrame(interval);
+      } else {
+        previousTime = 0;
+      }
       if (!sceneReadyRef.current) {
         sceneReadyRef.current = true;
         window.clearTimeout(loaderTimerRef.current);
@@ -1753,6 +1958,18 @@ export default function BrandScene() {
       if (!document.hidden && visible) frameId = window.requestAnimationFrame(renderFrame);
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+    // Compile the heavy glass shader in the background (KHR_parallel_shader_compile) for the render
+    // target it is drawn into, instead of freezing the main thread on the first frame.
+    renderer.setRenderTarget(sceneTarget);
+    const shaderCompilation = renderer.compileAsync(scene, camera)
+      .catch(() => undefined)
+      .then(() => {
+        if (sceneDisposed) return;
+        renderer.setRenderTarget(null);
+        shadersReady = true;
+        updateCards();
+        renderWithRefraction();
+      });
     frameId = window.requestAnimationFrame(renderFrame);
 
     return () => {
@@ -1787,28 +2004,30 @@ export default function BrandScene() {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       observer.disconnect();
       resizeObserver.disconnect();
-      [scene, cardScene].forEach((root) => root.traverse((object) => {
-        if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
-          object.geometry.dispose();
-          const materials = Array.isArray(object.material) ? object.material : [object.material];
-          materials.forEach((material) => material.dispose());
-        }
-      }));
-      postQuad.geometry.dispose();
-      waveMaterial.dispose();
-      compositeMaterial.dispose();
-      sceneTarget.dispose();
-      waveTargets.forEach((target) => target.dispose());
-      renderer.dispose();
-      ledTextTexture.dispose();
-      ledIntroTexture.dispose();
-      ledReflectionTextures.forEach((texture) => texture.dispose());
-      cardTitleTexture.dispose();
-      panatTexture.dispose();
-      cardTextures.forEach((texture) => texture.dispose());
-      refractionTarget.dispose();
-      environmentTarget.dispose();
       renderer.domElement.remove();
+      void shaderCompilation.then(() => {
+        [scene, cardScene].forEach((root) => root.traverse((object) => {
+          if (object instanceof THREE.Mesh || object instanceof THREE.Points || object instanceof THREE.LineSegments) {
+            object.geometry.dispose();
+            const materials = Array.isArray(object.material) ? object.material : [object.material];
+            materials.forEach((material) => material.dispose());
+          }
+        }));
+        postQuad.geometry.dispose();
+        waveMaterial.dispose();
+        compositeMaterial.dispose();
+        sceneTarget.dispose();
+        waveTargets.forEach((target) => target.dispose());
+        renderer.dispose();
+        ledTextTexture.dispose();
+        ledIntroTexture.dispose();
+        ledReflectionTextures.forEach((texture) => texture.dispose());
+        cardTitleTexture.dispose();
+        panatTexture.dispose();
+        cardTextures.forEach((texture) => texture.dispose());
+        refractionTarget.dispose();
+        environmentTarget.dispose();
+      });
     };
   }, [smoothScroll]);
 
