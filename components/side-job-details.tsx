@@ -69,7 +69,7 @@ export default function SideJobDetails() {
         <div className="sj-hero__visual" aria-hidden="true">
           <span className="sj-hero__glow" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/side-job-person.png" alt="" />
+          <img src="/side-job-person.webp" alt="" width={800} height={1200} decoding="async" />
         </div>
       </section>
 

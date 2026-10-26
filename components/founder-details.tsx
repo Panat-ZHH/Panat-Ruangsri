@@ -114,7 +114,7 @@ export default function FounderDetails() {
                 <span>PR</span>
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src="/founder-portrait.png" alt="Panat Ruangsri" onError={() => setPortraitFailed(true)} />
+                <img src="/founder-portrait.webp" width={480} height={720} decoding="async" alt="Panat Ruangsri" onError={() => setPortraitFailed(true)} />
               )}
             </div>
             <strong>Founder &amp; CEO</strong>

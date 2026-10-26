@@ -241,7 +241,28 @@ function createLedUniforms(textTexture: THREE.CanvasTexture, introTexture: THREE
     uCardTitles: { value: titleTexture },
     uCardTitleColors: { value: Array.from({ length: 4 }, () => new THREE.Vector3(1, 1, 1)) },
     uAccentCells: { value: Array.from({ length: 5 }, () => new THREE.Vector2()) },
+    uSnakeBounds: { value: Array.from({ length: 2 }, () => new THREE.Vector4()) },
   };
+}
+
+function snakePoint(phase: number, target: THREE.Vector2) {
+  return target.set(18 + 8 * Math.sin(phase * 0.83) + 2 * Math.sin(phase * 1.91), 3.5 + 2.6 * Math.sin(phase * 0.64));
+}
+
+// Bounding box of each snake (plus its widest stroke) so LEDs far away from it skip the 28-segment test.
+function updateSnakeBounds(bounds: THREE.Vector4[], effectTime: number, point: THREE.Vector2) {
+  bounds.forEach((box, index) => {
+    const head = index === 0 ? effectTime * 0.65 : effectTime * 0.57 + 4.2;
+    box.set(Infinity, Infinity, -Infinity, -Infinity);
+    for (let segment = 0; segment <= 28; segment += 1) {
+      snakePoint(head - segment / 28 * 2.5, point);
+      box.set(Math.min(box.x, point.x), Math.min(box.y, point.y), Math.max(box.z, point.x), Math.max(box.w, point.y));
+    }
+    box.x -= 0.32;
+    box.y -= 0.32;
+    box.z += 0.32;
+    box.w += 0.32;
+  });
 }
 
 // Everything on the LED wall is constant per LED, so it is computed once per LED into a
@@ -268,6 +289,7 @@ function createLedContentMaterial(uniforms: ReturnType<typeof createLedUniforms>
       uniform sampler2D uCardTitles;
       uniform vec3 uCardTitleColors[4];
       uniform vec2 uAccentCells[5];
+      uniform vec4 uSnakeBounds[2];
       varying vec2 vUv;
       float diagonalTitle(float index, float line, vec2 wallUv) {
         vec2 wall = vec2((0.5 - wallUv.x) * 2.2 + 0.5, wallUv.y) - 0.5;
@@ -332,6 +354,9 @@ function createLedContentMaterial(uniforms: ReturnType<typeof createLedUniforms>
         if (uSceneActive > 0.001 && uCardReflectionBlend < 0.999) {
           vec2 screenPosition = ledGrid / 30.0;
           for (int snakeIndex = 0; snakeIndex < 2; snakeIndex++) {
+            vec4 bounds = uSnakeBounds[snakeIndex];
+            if (screenPosition.x < bounds.x || screenPosition.y < bounds.y
+              || screenPosition.x > bounds.z || screenPosition.y > bounds.w) continue;
             float phase = snakeIndex == 0 ? uEffectTime * 0.65 : uEffectTime * 0.57 + 4.2;
             vec2 previousPoint = snakePath(phase);
             for (int segment = 1; segment <= 28; segment++) {
@@ -509,11 +534,12 @@ export default function BrandScene() {
     refractionTarget.texture.generateMipmaps = false;
     const refractionResolution = new THREE.Vector2(1, 1);
     const floatTargets = renderer.extensions.has('EXT_color_buffer_float');
-    const sceneTarget = new THREE.WebGLRenderTarget(1, 1, {
+    const createSceneTarget = (width: number, height: number) => new THREE.WebGLRenderTarget(width, height, {
       type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
       samples: lowPower ? 0 : Math.min(4, renderer.capabilities.maxSamples),
       depthBuffer: true,
     });
+    let sceneTarget = createSceneTarget(1, 1);
     const ledContentTargets = Array.from({ length: 2 }, () => new THREE.WebGLRenderTarget(LED_COLUMNS, LED_ROWS, {
       type: floatTargets ? THREE.HalfFloatType : THREE.UnsignedByteType,
       minFilter: THREE.NearestFilter,
@@ -671,6 +697,7 @@ export default function BrandScene() {
     const ledReflectionTextures = Array.from({ length: 4 }, () => createLedReflectionTexture());
     const cardTitleTexture = createCardTitleTexture();
     const ledUniforms = createLedUniforms(ledTextTexture, ledIntroTexture, ledReflectionTextures, cardTitleTexture);
+    updateSnakeBounds(ledUniforms.uSnakeBounds.value, 0, new THREE.Vector2());
     const ledContentMaterials = (['base', 'emission'] as const)
       .map((output) => createLedContentMaterial(ledUniforms, output, postVertexShader));
     const ledScreenMaterial = createLedScreenMaterial(ledContentTargets[0].texture, ledContentTargets[1].texture);
@@ -1132,11 +1159,15 @@ export default function BrandScene() {
           uCardPhotoReady: { value: 0 },
         },
       });
-      const texture = textureLoader.load(source, () => {
+      const texture = textureLoader.load(source, async () => {
+        // Decode off the main thread and upload right away, so the first scroll into the cards
+        // doesn't stall on image decoding and GPU upload.
+        await (texture.image as HTMLImageElement).decode?.().catch(() => undefined);
         if (sceneDisposed) {
           texture.dispose();
           return;
         }
+        renderer.initTexture(texture);
         material.uniforms.uCardPhotoReady.value = 1;
         const reflection = createLedReflectionTexture(texture.image as HTMLImageElement);
         ledReflectionTextures[index].dispose();
@@ -1228,7 +1259,14 @@ export default function BrandScene() {
       renderer.setPixelRatio(ratio * qualityScale);
       renderer.setSize(viewportWidth, viewportHeight, false);
       renderer.getDrawingBufferSize(refractionResolution);
-      sceneTarget.setSize(refractionResolution.x, refractionResolution.y);
+      // Resizing a multisampled target in place keeps its old renderbuffer in three r177, which
+      // crops the picture after a resize, so the target is recreated instead.
+      if (sceneTarget.width !== refractionResolution.x || sceneTarget.height !== refractionResolution.y) {
+        sceneTarget.dispose();
+        sceneTarget = createSceneTarget(refractionResolution.x, refractionResolution.y);
+        compositeMaterial.uniforms.uScene.value = sceneTarget.texture;
+        copyMaterial.uniforms.uSource.value = sceneTarget.texture;
+      }
       refractionTarget.setSize(Math.ceil(refractionResolution.x / 2), Math.ceil(refractionResolution.y / 2));
     };
     const resizeObserver = new ResizeObserver(() => {
@@ -1773,24 +1811,27 @@ export default function BrandScene() {
     window.addEventListener('pointermove', onParallaxMove, { passive: true });
     document.documentElement.addEventListener('mouseleave', onParallaxLeave);
     const effectStartedAt = performance.now();
+    const snakeScratch = new THREE.Vector2();
     // Frame-time monitor: if the device can't hold ~45 fps, render fewer pixels. When dropping the
     // resolution doesn't help (30 Hz power-saving caps, CPU-bound devices) the previous size is
     // restored and the monitor stops, so it never degrades the image for nothing.
-    const monitor = { skip: 60, samples: 0, total: 0, slowWindows: 0, pending: false, lastAverage: 0, previousScale: 1, locked: reduceMotion };
+    // Windows are time based so very slow devices (a few fps) are judged as quickly as fast ones.
+    const monitor = { skipMs: 1500, samples: 0, total: 0, slowWindows: 0, pending: false, lastAverage: 0, previousScale: 1, locked: reduceMotion };
     const monitorFrame = (interval: number) => {
       if (monitor.locked) return;
-      if (interval > 250) {
+      // Longer gaps come from tab switches or a paused loop, not from rendering.
+      if (interval > 1000) {
         monitor.samples = 0;
         monitor.total = 0;
         return;
       }
-      if (monitor.skip > 0) {
-        monitor.skip -= 1;
+      if (monitor.skipMs > 0) {
+        monitor.skipMs -= interval;
         return;
       }
       monitor.total += interval;
       monitor.samples += 1;
-      if (monitor.samples < 40) return;
+      if (monitor.total < 750 || monitor.samples < 6) return;
       const average = monitor.total / monitor.samples;
       monitor.samples = 0;
       monitor.total = 0;
@@ -1804,14 +1845,14 @@ export default function BrandScene() {
         }
       }
       monitor.slowWindows = average > 22 ? monitor.slowWindows + 1 : 0;
-      if (monitor.slowWindows >= 2 && qualityScale > 0.55) {
+      if (monitor.slowWindows >= 2 && qualityScale > 0.45) {
         monitor.slowWindows = 0;
         monitor.pending = true;
         monitor.lastAverage = average;
         monitor.previousScale = qualityScale;
-        qualityScale = Math.max(0.55, qualityScale * 0.8);
+        qualityScale = Math.max(0.45, qualityScale * 0.8);
         applyResolution();
-        monitor.skip = 15;
+        monitor.skipMs = 300;
       }
     };
     const renderFrame = (time: number) => {
@@ -1899,6 +1940,7 @@ export default function BrandScene() {
         ledUniforms.uTime.value = time * 0.00008;
         ledUniforms.uFlickerTime.value = time * 0.001;
         ledUniforms.uEffectTime.value = (time - effectStartedAt) * 0.001;
+        updateSnakeBounds(ledUniforms.uSnakeBounds.value, ledUniforms.uEffectTime.value, snakeScratch);
         const smoothing = 1 - Math.exp(-delta * 12);
         const sceneBlend = ledUniforms.uSceneActive;
         sceneBlend.value = THREE.MathUtils.lerp(sceneBlend.value, sceneBlendTarget, smoothing);
@@ -1961,7 +2003,14 @@ export default function BrandScene() {
     // Compile the heavy glass shader in the background (KHR_parallel_shader_compile) for the render
     // target it is drawn into, instead of freezing the main thread on the first frame.
     renderer.setRenderTarget(sceneTarget);
-    const shaderCompilation = renderer.compileAsync(scene, camera)
+    const sceneCompilation = renderer.compileAsync(scene, camera);
+    // The cards are drawn straight onto the canvas and are hidden until scrolled to, so their shader
+    // is compiled for the canvas with the cards briefly marked visible (compile skips hidden objects).
+    renderer.setRenderTarget(null);
+    cardGroup.visible = true;
+    const cardCompilation = renderer.compileAsync(cardScene, camera);
+    cardGroup.visible = false;
+    const shaderCompilation = Promise.all([sceneCompilation, cardCompilation])
       .catch(() => undefined)
       .then(() => {
         if (sceneDisposed) return;
@@ -2016,6 +2065,9 @@ export default function BrandScene() {
         postQuad.geometry.dispose();
         waveMaterial.dispose();
         compositeMaterial.dispose();
+        copyMaterial.dispose();
+        ledContentMaterials.forEach((material) => material.dispose());
+        ledContentTargets.forEach((target) => target.dispose());
         sceneTarget.dispose();
         waveTargets.forEach((target) => target.dispose());
         renderer.dispose();

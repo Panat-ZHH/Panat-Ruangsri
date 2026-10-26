@@ -11,7 +11,7 @@ const hobbies: { id: string; name: string; period: string; title: string; text: 
     period: 'Seit 1 Jahr',
     title: 'Vom ersten Training zum ersten Turniersieg.',
     text: 'Ich spiele seit einem Jahr Tennis. Im ersten Jahr habe ich eines von zwei gespielten Turnieren gewonnen und bin von R9 auf R8 aufgestiegen.',
-    image: '/tennis-person.png',
+    image: '/tennis-person.webp',
     stats: [
       { value: 1, suffix: ' / 2', label: 'Turniere gewonnen' },
       { value: 0, label: 'Klassierung', text: 'R9 → R8' },
@@ -23,7 +23,7 @@ const hobbies: { id: string; name: string; period: string; title: string; text: 
     period: '11 – 17 Jahre',
     title: 'Ein Würfel, elf Sekunden.',
     text: 'Von 11 bis 17 habe ich regelmässig Speedcubing betrieben. Das hat mein räumliches Vorstellungsvermögen geschärft und mich zu meinem Rekord gebracht: ein gelöster Cube in 11 Sekunden an einem Turnier.',
-    image: '/speedcube.png',
+    image: '/speedcube.webp',
     stats: [
       { value: 11, suffix: ' s', label: 'Turnier-Rekord' },
       { value: 6, suffix: ' Jahre', label: 'Regelmässiges Training' },
@@ -47,7 +47,7 @@ const hobbies: { id: string; name: string; period: string; title: string; text: 
     period: 'Regelmässig',
     title: 'Ausgleich zu langen Arbeitstagen.',
     text: 'Neben Ausbildung, Wendico und dem Restaurant gehe ich regelmässig ins Gym, um fit und fokussiert zu bleiben.',
-    image: '/gym-person.png',
+    image: '/gym-person.webp',
     stats: [
       { value: 0, label: 'Rhythmus', text: 'Regelmässig' },
       { value: 0, label: 'Ziel', text: 'Fit neben der Arbeit' },
@@ -148,7 +148,7 @@ export default function HobbyDetails() {
             <span className="sj-hero__glow" />
             {hobby.visual === 'tiktok' ? <TikTokCard /> : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={hobby.image} alt="" />
+              <img src={hobby.image} alt="" loading="lazy" decoding="async" />
             )}
           </div>
           <div className="hb-row__text">

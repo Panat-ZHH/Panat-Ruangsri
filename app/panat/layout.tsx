@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     description: 'Softwareentwicklung bei Swisscom, Unternehmertum mit Wendico und die Interessen dahinter.',
     images: [{ url: '/panat/opengraph-image', width: 1200, height: 630, alt: 'Panat Ruangsri, Software Developer und Founder' }],
   },
-  twitter: { card: 'summary_large_image', images: ['/opengraph-image'] },
+  twitter: { card: 'summary_large_image', images: ['/panat/opengraph-image'] },
   formatDetection: { telephone: false },
 };
 
