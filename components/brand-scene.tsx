@@ -1150,7 +1150,7 @@ export default function BrandScene() {
     const textureLoader = new THREE.TextureLoader();
     const cardTextures: THREE.Texture[] = [];
     let sceneDisposed = false;
-    const cards = ['/software-card.webp', '/founder-card.webp', '/sideJobs-card.webp', '/more-card.webp'].map((source, index) => {
+    const cards = ['/software-card-neu.webp', '/founder-card-new.webp', '/side-job-card-new.webp', '/more-card-new.webp'].map((source, index) => {
       const material = new THREE.ShaderMaterial({
         ...cardMaterialParameters,
         uniforms: {
