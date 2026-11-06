@@ -57,9 +57,9 @@ export default function LaptopPreview() {
                 /> : (
                   <div className="laptop__consent">
                     <strong>Wendico live</strong>
-                    <p>Die Vorschau lädt die externe Website wendico.ch und übermittelt dabei Daten wie deine IP-Adresse.</p>
-                    <button type="button" onClick={allowExternal}>Externe Vorschau laden</button>
-                    <Link href="/panat/legal/privacy">Datenschutzhinweise</Link>
+                    <p>This preview loads the external website wendico.ch and sends data such as your IP address.</p>
+                    <button type="button" onClick={allowExternal}>Load live preview</button>
+                    <Link href="/panat/legal/privacy">Privacy notice</Link>
                   </div>
                 )}
               </div>

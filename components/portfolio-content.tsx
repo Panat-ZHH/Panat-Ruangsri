@@ -7,7 +7,7 @@ import HobbyDetails from '@/components/hobby-details';
 export const portfolioPages = [
   {
     slug: 'software-developer', title: 'Software Developer', eyebrow: 'Swisscom',
-    description: 'Panat Ruangsri absolviert bei Swisscom in Zürich die Ausbildung zum Informatiker EFZ Applikationsentwicklung, 2023 bis voraussichtlich Sommer 2027. Stationen, Technologien und Projekte.',
+    description: 'Panat Ruangsri is completing a Swiss Federal VET Diploma in Application Development at Swisscom in Zurich, from 2023 to summer 2027. Explore his team placements, technologies and projects.',
     content: <SoftwareDetails />,
     theme: {
       '--theme-accent': '#3d9bff', '--theme-accent-rgb': '61,155,255', '--theme-on-accent': '#ffffff',
@@ -27,7 +27,7 @@ export const portfolioPages = [
   },
   {
     slug: 'side-jobs', title: 'Side Jobs', eyebrow: 'Reb-Thai',
-    description: 'Neben seiner Ausbildung und Wendico unterstützt Panat Ruangsri das Familienrestaurant Reb-Thai in Andelfingen: Take-away, Buffet, Restaurantbetrieb und Gästekontakt.',
+    description: 'Alongside his apprenticeship and work at Wendico, Panat Ruangsri supports his family’s restaurant, Reb-Thai, in Andelfingen with takeaway, buffet and restaurant service.',
     content: <SideJobDetails />,
     theme: {
       '--theme-accent': '#e39d5c', '--theme-accent-rgb': '227,157,92', '--theme-on-accent': '#1a0f08',
@@ -36,8 +36,8 @@ export const portfolioPages = [
     } as CSSProperties,
   },
   {
-    slug: 'hobbys', title: 'Hobbys', eyebrow: 'Beyond work',
-    description: 'Panat Ruangsri über Tennis, Gym und Speedcubing: R8 im ersten Tennisjahr, ein Turniersieg, ein Cube-Rekord von 11 Sekunden und über 500.000 TikTok-Follower.',
+    slug: 'hobbys', title: 'Hobbies', eyebrow: 'Beyond work',
+    description: 'Panat Ruangsri on tennis, the gym and speedcubing: an R8 ranking in his first tennis year, a tournament win, an 11-second cube record and 500,000+ TikTok followers.',
     content: <HobbyDetails />,
     theme: {
       '--theme-accent': '#a8c293', '--theme-accent-rgb': '168,194,147', '--theme-on-accent': '#0b0d0a',

@@ -5,8 +5,8 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://ruangsri.ch'),
-  title: 'Panat Ruangsri | Software Developer & Co-Founder von Wendico',
-  description: 'Panat Ruangsri: Software Developer in Ausbildung bei Swisscom, Co-Founder und CEO von Wendico KLG. Projekte, Erfahrungen und Interessen aus der Schweiz.',
+  title: 'Panat Ruangsri | Software Developer & Co-Founder at Wendico',
+  description: 'Panat Ruangsri is a software developer apprentice at Swisscom and Co-Founder and CEO of Wendico KLG. Explore his projects, experience and interests in Switzerland.',
   alternates: { canonical: '/panat' },
   openGraph: { url: '/panat' },
 };
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 const profile = {
   '@context': 'https://schema.org', '@type': 'ProfilePage',
   '@id': 'https://ruangsri.ch/panat#profile', url: 'https://ruangsri.ch/panat',
-  name: 'Panat Ruangsri - Portfolio', inLanguage: 'de-CH',
+  name: 'Panat Ruangsri - Portfolio', inLanguage: 'en',
   mainEntity: {
     '@type': 'Person', '@id': 'https://ruangsri.ch/panat#person', name: 'Panat Ruangsri',
     url: 'https://ruangsri.ch/panat', email: 'panat@ruangsri.ch',
@@ -24,18 +24,18 @@ const profile = {
       { '@type': 'Organization', name: 'Swisscom' },
       { '@type': 'Organization', name: 'Wendico KLG', url: 'https://wendico.ch' },
     ],
-    knowsAbout: ['Softwareentwicklung', 'Vue.js', 'Nuxt', 'JavaScript', 'Unternehmertum', 'Webentwicklung'],
-    description: 'Software Developer in Ausbildung bei Swisscom und Co-Founder von Wendico KLG in der Schweiz.',
+    knowsAbout: ['Software development', 'Vue.js', 'Nuxt', 'JavaScript', 'Entrepreneurship', 'Web development'],
+    description: 'Software developer apprentice at Swisscom and Co-Founder of Wendico KLG in Switzerland.',
   },
 };
 
 export default function PanatHomePage() {
   return (
-    <main id="main-content">
+    <main id="main-content" lang="en">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(profile).replace(/</g, '\\u003c') }} />
-      <h1 className="visually-hidden">Panat Ruangsri - Software Developer und Co-Founder von Wendico</h1>
+      <h1 className="visually-hidden">Panat Ruangsri - Software Developer and Co-Founder of Wendico</h1>
       <div className="home">
-        <section className="hero" id="top" aria-label="Panat Ruangsri homepage">
+        <section className="hero" id="top" aria-label="Panat Ruangsri homepage" lang="en">
           <div className="hero__grid" aria-hidden="true" />
           <BrandScene />
           <HeroCardActions />

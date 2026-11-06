@@ -41,18 +41,18 @@ export default function PrivacyPreferences({ children }: { children: ReactNode }
   return (
     <PrivacyContext.Provider value={{ external, allowExternal: () => save(true), openSettings }}>
       {children}
-      <dialog ref={dialogRef} className="privacy-dialog" aria-labelledby="privacy-title" data-lenis-prevent>
+      <dialog ref={dialogRef} className="privacy-dialog" aria-labelledby="privacy-title" data-lenis-prevent lang="en">
         <form method="dialog" onSubmit={() => save(draft)}>
-          <h2 id="privacy-title">Datenschutz-Einstellungen</h2>
-          <p>Diese Website verwendet keine Analyse- oder Werbe-Tracker. Externe Inhalte bleiben ohne deine Zustimmung blockiert.</p>
+          <h2 id="privacy-title">Privacy settings</h2>
+          <p>This site does not use analytics or advertising trackers. External content stays blocked until you consent.</p>
           <label className="privacy-option">
             <input type="checkbox" checked={draft} onChange={(event) => setDraft(event.target.checked)} />
-            <span><strong>Externe Website-Inhalte</strong>Die Live-Vorschau von wendico.ch darf geladen werden. Dabei wird unter anderem deine IP-Adresse an den externen Anbieter übermittelt.</span>
+            <span><strong>External website content</strong>The live preview of wendico.ch may be loaded. This sends your IP address and other connection data to the external provider.</span>
           </label>
-          <p>Die Auswahl wird lokal in diesem Browser gespeichert. Ein Widerruf beendet die Einbettung, löscht aber keine vom externen Anbieter bereits gespeicherten Daten.</p>
+          <p>Your choice is stored locally in this browser. Revoking consent stops the embed but does not delete data already stored by the external provider.</p>
           <div className="privacy-actions">
-            <button type="button" onClick={() => { setDraft(false); save(false); dialogRef.current?.close(); }}>Externe Inhalte ablehnen</button>
-            <button type="submit">Auswahl speichern</button>
+            <button type="button" onClick={() => { setDraft(false); save(false); dialogRef.current?.close(); }}>Reject external content</button>
+            <button type="submit">Save choices</button>
           </div>
         </form>
       </dialog>
@@ -62,5 +62,5 @@ export default function PrivacyPreferences({ children }: { children: ReactNode }
 
 export function PrivacySettingsButton() {
   const { openSettings } = usePrivacy();
-  return <button type="button" onClick={openSettings}>Cookie-Einstellungen</button>;
+  return <button type="button" onClick={openSettings}>Cookie settings</button>;
 }

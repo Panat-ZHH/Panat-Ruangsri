@@ -157,7 +157,7 @@ export default function CardDetails() {
               if (!shown && event.target === event.currentTarget && event.propertyName === 'transform') setActive(null);
             }}
           >
-            <button ref={closeRef} type="button" className="details-sheet__close" aria-label="Schliessen" onClick={close}>
+            <button ref={closeRef} type="button" className="details-sheet__close" aria-label="Close details" onClick={close}>
               <span aria-hidden="true" />
             </button>
             <div ref={scrollRef} className="details-sheet__scroll" data-lenis-prevent>

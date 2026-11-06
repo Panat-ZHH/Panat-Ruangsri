@@ -215,7 +215,7 @@ function createCardTitleTexture() {
     context.font = '700 112px "Avenir Next", sans-serif';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
-    ['SOFTWARE DEVELOPER', 'FOUNDER', 'SIDE JOBS', 'HOBBYS'].forEach((title, index) => {
+    ['SOFTWARE DEVELOPER', 'FOUNDER', 'SIDE JOBS', 'HOBBIES'].forEach((title, index) => {
       context.fillText(title, canvas.width / 2, index * 192 + 96, canvas.width * 0.92);
     });
   }

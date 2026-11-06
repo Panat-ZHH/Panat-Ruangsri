@@ -2,48 +2,48 @@
 
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 
-type Focus = 'Frontend' | 'Full-Stack' | 'Leadership' | 'KI';
+type Focus = 'Frontend' | 'Full-Stack' | 'Leadership' | 'AI';
 
 const TOTAL_MONTHS = 48;
 
 const stations: { team: string; role: string; period: string; start: number; end: number; focus: Focus[]; points: string[] }[] = [
-  { team: 'HIVE', role: 'Frontend Developer Apprentice', period: 'Aug 2023 – Feb 2024', start: 0, end: 6, focus: ['Frontend'], points: ['Frontend-Entwicklung', 'AngularJS und JavaScript'] },
-  { team: 'Lernenden Hub', role: 'Full-Stack Developer Apprentice', period: 'Feb 2024 – Aug 2024', start: 6, end: 12, focus: ['Full-Stack', 'Frontend'], points: ['Entwicklung mit Vue.js', 'Mitarbeit an einer Full-Stack-Anwendung'] },
-  { team: 'KeyCom', role: 'Full-Stack Developer Apprentice', period: 'Aug 2024 – Jun 2025', start: 12, end: 22, focus: ['Full-Stack'], points: ['Full-Stack-Entwicklung', 'Mitarbeit in einem professionellen Softwareentwicklungsteam'] },
-  { team: 'LOOP Operativ B2B', role: 'Team Leader Apprentice', period: 'Jun 2025 – Feb 2026', start: 22, end: 30, focus: ['Leadership'], points: ['Führung eines Lernenden-Teams', 'Organisation und Koordination', 'Kommunikation und Begleitung anderer Lernender'] },
-  { team: 'NewsRoom', role: 'Full-Stack Developer Apprentice', period: 'Feb 2026 – Aug 2026', start: 30, end: 36, focus: ['Full-Stack'], points: ['Full-Stack-Entwicklung', 'Arbeit mit AngularJS'] },
-  { team: 'ATLAS', role: 'Frontend Developer Apprentice', period: 'Seit Aug 2026', start: 36, end: 48, focus: ['Frontend', 'Leadership', 'KI'], points: ['Bereich Data, Analytics & AI', 'Frontend einer unternehmensweiten Anwendung für interne Nutzer', 'Vue.js und Nuxt', 'Technische Leitung eines kleinen Lernenden-Teams', 'Vertiefung im Bereich KI'] },
+  { team: 'HIVE', role: 'Frontend Developer Apprentice', period: 'Aug 2023 – Feb 2024', start: 0, end: 6, focus: ['Frontend'], points: ['Frontend development', 'AngularJS and JavaScript'] },
+  { team: 'Lernenden Hub', role: 'Full-Stack Developer Apprentice', period: 'Feb 2024 – Aug 2024', start: 6, end: 12, focus: ['Full-Stack', 'Frontend'], points: ['Development with Vue.js', 'Contributed to a full-stack application'] },
+  { team: 'KeyCom', role: 'Full-Stack Developer Apprentice', period: 'Aug 2024 – Jun 2025', start: 12, end: 22, focus: ['Full-Stack'], points: ['Full-stack development', 'Contributed to a professional software development team'] },
+  { team: 'LOOP Operativ B2B', role: 'Team Leader Apprentice', period: 'Jun 2025 – Feb 2026', start: 22, end: 30, focus: ['Leadership'], points: ['Led a team of apprentices', 'Organised and coordinated work', 'Communicated with and supported fellow apprentices'] },
+  { team: 'NewsRoom', role: 'Full-Stack Developer Apprentice', period: 'Feb 2026 – Aug 2026', start: 30, end: 36, focus: ['Full-Stack'], points: ['Full-stack development', 'Worked with AngularJS'] },
+  { team: 'ATLAS', role: 'Frontend Developer Apprentice', period: 'Since Aug 2026', start: 36, end: 48, focus: ['Frontend', 'Leadership', 'AI'], points: ['Data, Analytics & AI division', 'Frontend development for an enterprise-wide internal application', 'Vue.js and Nuxt', 'Technical lead for a small apprentice team', 'Further specialising in AI'] },
 ];
 
 
 const techProfile: { area: string; items: { name: string; text: string; where: string[]; logo?: string }[] }[] = [
   { area: 'Frontend', items: [
-    { name: 'Vue.js', logo: '/logos/vue.png', text: 'Im Lernenden Hub gelernt und heute bei ATLAS für das Frontend einer unternehmensweiten Anwendung genutzt.', where: ['Lernenden Hub', 'ATLAS'] },
-    { name: 'Nuxt', logo: '/logos/nuxt.png', text: 'Bei ATLAS im Bereich Data, Analytics & AI als Framework für das Vue-Frontend im Einsatz.', where: ['ATLAS'] },
-    { name: 'AngularJS', logo: '/logos/angularjs.png', text: 'Im ersten Team HIVE gelernt und später bei NewsRoom in der Full-Stack-Entwicklung vertieft.', where: ['HIVE', 'NewsRoom'] },
-    { name: 'JavaScript', logo: '/logos/javascript.png', text: 'Die Basis seit dem Start bei HIVE und in allen Teams bei Swisscom täglich genutzt.', where: ['HIVE', 'Alle Teams'] },
+    { name: 'Vue.js', logo: '/logos/vue.png', text: 'Learned at Lernenden Hub and now used at ATLAS for the frontend of an enterprise-wide application.', where: ['Lernenden Hub', 'ATLAS'] },
+    { name: 'Nuxt', logo: '/logos/nuxt.png', text: 'Used at ATLAS as the framework for a Vue frontend in the Data, Analytics & AI division.', where: ['ATLAS'] },
+    { name: 'AngularJS', logo: '/logos/angularjs.png', text: 'Learned in my first team, HIVE, and later deepened through full-stack work at NewsRoom.', where: ['HIVE', 'NewsRoom'] },
+    { name: 'JavaScript', logo: '/logos/javascript.png', text: 'A core skill since joining HIVE and used daily across my Swisscom teams.', where: ['HIVE', 'All teams'] },
   ] },
   { area: 'Backend / Full-Stack', items: [
-    { name: 'Node.js', logo: '/logos/nodejs.png', text: 'Für die Backend-Seite in den Full-Stack-Stationen bei Swisscom eingesetzt.', where: ['Full-Stack-Teams'] },
-    { name: 'SQL', logo: '/logos/sql.png', text: 'Datenbank-Grundlagen aus der Ausbildung an der BBW, angewendet in Full-Stack-Projekten.', where: ['BBW', 'Full-Stack-Teams'] },
-    { name: 'MariaDB', logo: '/logos/mariadb.png', text: 'Relationale Datenbank für Webanwendungen in Projekten aufgesetzt und genutzt.', where: ['Projekte'] },
-    { name: 'MongoDB', logo: '/logos/mongodb.png', text: 'Dokumentenbasierte NoSQL-Datenbank für flexible Datenmodelle in Projekten eingesetzt.', where: ['Projekte'] },
+    { name: 'Node.js', logo: '/logos/nodejs.png', text: 'Used for backend development across my full-stack placements at Swisscom.', where: ['Full-stack teams'] },
+    { name: 'SQL', logo: '/logos/sql.png', text: 'Database fundamentals from my BBW studies, applied in full-stack projects.', where: ['BBW', 'Full-stack teams'] },
+    { name: 'MariaDB', logo: '/logos/mariadb.png', text: 'Set up and used a relational database for web applications and projects.', where: ['Projects'] },
+    { name: 'MongoDB', logo: '/logos/mongodb.png', text: 'Applied a document-oriented NoSQL database for flexible data models.', where: ['Projects'] },
   ] },
   { area: 'Eigene Projekte', items: [
-    { name: 'React', logo: '/logos/react.png', text: 'In eigenen Projekten gelernt, um moderne Web-Oberflächen umzusetzen.', where: ['Eigene Projekte'] },
-    { name: 'Next.js', logo: '/logos/nextjs.png', text: 'Für eigene Webanwendungen genutzt, unter anderem für dieses Portfolio.', where: ['Eigene Projekte', 'Portfolio'] },
-    { name: 'Web-Apps', text: 'Konzeption und Umsetzung moderner Webanwendungen ausserhalb der Ausbildung.', where: ['Eigene Projekte'] },
+    { name: 'React', logo: '/logos/react.png', text: 'Learned through personal projects to build modern web interfaces.', where: ['Personal projects'] },
+    { name: 'Next.js', logo: '/logos/nextjs.png', text: 'Used to build personal web applications, including this portfolio.', where: ['Personal projects', 'Portfolio'] },
+    { name: 'Web apps', text: 'Planning and building modern web applications outside my apprenticeship.', where: ['Personal projects'] },
   ] },
-  { area: 'Cloud & KI', items: [
-    { name: 'AWS', logo: '/logos/aws.png', text: 'Cloud-Services von Amazon Web Services für Hosting und Deployment kennengelernt und eingesetzt.', where: ['Ausbildung', 'Projekte'] },
-    { name: 'Docker', logo: '/logos/docker.png', text: 'Container für reproduzierbare Entwicklungs- und Deployment-Umgebungen genutzt.', where: ['Projekte'] },
-    { name: 'KI-Entwicklung', text: 'KI-gestützte Entwicklung im Alltag und Vertiefung im KI-Bereich bei ATLAS.', where: ['ATLAS'] },
-    { name: 'Data & Analytics', text: 'Bei ATLAS im Bereich Data, Analytics & AI für interne Nutzer tätig.', where: ['ATLAS'] },
+  { area: 'Cloud & AI', items: [
+    { name: 'AWS', logo: '/logos/aws.png', text: 'Explored and used Amazon Web Services for cloud hosting and deployment.', where: ['Apprenticeship', 'Projects'] },
+    { name: 'Docker', logo: '/logos/docker.png', text: 'Used containers to create reproducible development and deployment environments.', where: ['Projects'] },
+    { name: 'AI development', text: 'Using AI-assisted development day to day and deepening my AI expertise at ATLAS.', where: ['ATLAS'] },
+    { name: 'Data & Analytics', text: 'Working on internal-user products in ATLAS’s Data, Analytics & AI division.', where: ['ATLAS'] },
   ] },
   { area: 'Projektarbeit', items: [
-    { name: 'Teamführung', text: 'Bei LOOP Operativ B2B ein Lernenden-Team geführt, organisiert und begleitet.', where: ['LOOP Operativ B2B'] },
-    { name: 'Tech Lead', text: 'Bei ATLAS die technische Leitung eines kleinen Lernenden-Teams übernommen.', where: ['ATLAS'] },
-    { name: 'Stakeholder', text: 'Abstimmung mit internen Nutzern und Stakeholdern einer unternehmensweiten Anwendung.', where: ['ATLAS'] },
+    { name: 'Team leadership', text: 'Led, organised and supported an apprentice team at LOOP Operativ B2B.', where: ['LOOP Operativ B2B'] },
+    { name: 'Technical leadership', text: 'Took on technical leadership for a small apprentice team at ATLAS.', where: ['ATLAS'] },
+    { name: 'Stakeholder collaboration', text: 'Aligned with internal users and stakeholders of an enterprise-wide application.', where: ['ATLAS'] },
   ] },
 ];
 
@@ -196,33 +196,33 @@ export default function SoftwareDetails() {
 
   return (
     <>
-      <section className="sd-overview" aria-label="Überblick">
+      <section className="sd-overview" aria-label="Overview">
         <div className="sd-tile">
-          <span className="details-label">Rolle</span>
+          <span className="details-label">Role</span>
           <strong>Software Developer Apprentice</strong>
         </div>
         <div className="sd-tile">
-          <span className="details-label">Unternehmen</span>
+          <span className="details-label">Company</span>
           <strong>Swisscom</strong>
-          <span>Zürich, Schweiz</span>
+          <span>Zurich, Switzerland</span>
         </div>
         <div className="sd-tile">
-          <span className="details-label">Ausbildung</span>
-          <strong>Informatiker EFZ</strong>
-          <span>Applikationsentwicklung · BBW</span>
+          <span className="details-label">Education</span>
+          <strong>IT Specialist, Application Development</strong>
+          <span>Swiss Federal VET Diploma · BBW</span>
         </div>
         <div className="sd-tile sd-tile--progress">
-          <span className="details-label">Fortschritt</span>
+          <span className="details-label">Progress</span>
           <strong>{Math.round(elapsedMonths / TOTAL_MONTHS * 100)}%</strong>
           <span className="sd-progress" aria-hidden="true"><span style={{ width: `${elapsedMonths / TOTAL_MONTHS * 100}%` }} /></span>
-          <span>Aug 2023 – Sommer 2027</span>
+          <span>Aug 2023 – Summer 2027</span>
         </div>
       </section>
 
       <section className="details-section">
         <header className="details-section__header">
-          <p className="details-label">Stationen bei Swisscom</p>
-          <p className="sd-hint">2023 → heute</p>
+          <p className="details-label">Swisscom experience</p>
+          <p className="sd-hint">2023 → present</p>
         </header>
 
         <div ref={timelineRef} className="sd-timeline">
@@ -239,7 +239,7 @@ export default function SoftwareDetails() {
                 <div className="sd-timeline__card">
                   <div className="sd-station__head">
                     <span className="sd-station__period">{entry.period}</span>
-                    {index === currentIndex && <span className="sd-badge">Aktuell</span>}
+                    {index === currentIndex && <span className="sd-badge">Current</span>}
                   </div>
                   <h4 className="sd-timeline__team">{entry.team}</h4>
                   <p className="sd-station__role">{entry.role}</p>
@@ -255,8 +255,8 @@ export default function SoftwareDetails() {
 
       <section className="details-section">
         <header className="details-section__header">
-          <p className="details-label">Technisches Profil</p>
-          <p className="sd-hint">Über einen Begriff fahren für Details</p>
+          <p className="details-label">Technical profile</p>
+          <p className="sd-hint">Hover over a skill for details</p>
         </header>
         <div className="sd-map" onMouseMove={tiltMap} onMouseLeave={resetTilt}>
           <StarField />

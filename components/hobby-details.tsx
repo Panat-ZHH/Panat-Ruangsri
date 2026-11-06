@@ -8,49 +8,49 @@ const hobbies: { id: string; name: string; period: string; title: string; text: 
   {
     id: 'tennis',
     name: 'Tennis',
-    period: 'Seit 1 Jahr',
-    title: 'Vom ersten Training zum ersten Turniersieg.',
-    text: 'Ich spiele seit einem Jahr Tennis. Im ersten Jahr habe ich eines von zwei gespielten Turnieren gewonnen und bin von R9 auf R8 aufgestiegen.',
+    period: '1 year',
+    title: 'From first practice to first tournament win.',
+    text: 'I have played tennis for one year. In my first year, I won one of the two tournaments I entered and improved my ranking from R9 to R8.',
     image: '/tennis-person.webp',
     stats: [
-      { value: 1, suffix: ' / 2', label: 'Turniere gewonnen' },
-      { value: 0, label: 'Klassierung', text: 'R9 → R8' },
+      { value: 1, suffix: ' / 2', label: 'Tournaments won' },
+      { value: 0, label: 'Ranking', text: 'R9 → R8' },
     ],
   },
   {
     id: 'speedcubing',
     name: 'Speedcubing',
-    period: '11 – 17 Jahre',
-    title: 'Ein Würfel, elf Sekunden.',
-    text: 'Von 11 bis 17 habe ich regelmässig Speedcubing betrieben. Das hat mein räumliches Vorstellungsvermögen geschärft und mich zu meinem Rekord gebracht: ein gelöster Cube in 11 Sekunden an einem Turnier.',
+    period: 'Ages 11–17',
+    title: 'One cube. Eleven seconds.',
+    text: 'From 11 to 17, I practised speedcubing regularly. It sharpened my spatial reasoning and led to my competition record: solving a cube in 11 seconds.',
     image: '/speedcube.webp',
     stats: [
-      { value: 11, suffix: ' s', label: 'Turnier-Rekord' },
-      { value: 6, suffix: ' Jahre', label: 'Regelmässiges Training' },
+      { value: 11, suffix: ' sec', label: 'Competition record' },
+      { value: 6, suffix: ' years', label: 'Regular practice' },
     ],
   },
   {
     id: 'tiktok',
     name: 'TikTok',
-    period: '13 – 17 Jahre',
-    title: 'Rubik’s-Cube-Tutorials für eine halbe Million Menschen.',
-    text: 'Zwischen 13 und 17 habe ich regelmässig Rubik’s-Cube-Tutorials und Videos gepostet. Daraus ist ein Account mit über 500’000 Followern entstanden.',
+    period: 'Ages 13–17',
+    title: 'Rubik’s Cube tutorials for half a million people.',
+    text: 'From 13 to 17, I regularly posted Rubik’s Cube tutorials and videos. The account grew to more than 500,000 followers.',
     visual: 'tiktok',
     stats: [
       { value: 500, suffix: 'K+', label: 'Follower' },
-      { value: 4, suffix: ' Jahre', label: 'Regelmässig Content' },
+      { value: 4, suffix: ' years', label: 'Creating regularly' },
     ],
   },
   {
     id: 'gym',
     name: 'Gym',
-    period: 'Regelmässig',
-    title: 'Ausgleich zu langen Arbeitstagen.',
-    text: 'Neben Ausbildung, Wendico und dem Restaurant gehe ich regelmässig ins Gym, um fit und fokussiert zu bleiben.',
+    period: 'Regularly',
+    title: 'A reset after long workdays.',
+    text: 'Alongside my apprenticeship, Wendico and the restaurant, I work out regularly to stay fit and focused.',
     image: '/gym-person.webp',
     stats: [
-      { value: 0, label: 'Rhythmus', text: 'Regelmässig' },
-      { value: 0, label: 'Ziel', text: 'Fit neben der Arbeit' },
+      { value: 0, label: 'Routine', text: 'Regularly' },
+      { value: 0, label: 'Goal', text: 'Fit alongside work' },
     ],
   },
 ];
@@ -112,7 +112,7 @@ function TikTokCard() {
     <ul>
       <li>Rubik’s-Cube-Tutorials</li>
       <li>Speedcubing-Videos</li>
-      <li>13 – 17 Jahre</li>
+      <li>Ages 13–17</li>
     </ul>
   </div>
   );
@@ -127,11 +127,11 @@ export default function HobbyDetails() {
     <>
       <section className="hb-intro">
         <div className="fd-intro__meta">
-          <p>Mehr als nur eine Sache</p>
+          <p>More than one thing</p>
           <p className="fd-tagline">Discipline · Growth · Creativity · Freedom</p>
         </div>
         <p className="hb-intro__note">Same person. Different interests.</p>
-        <nav className="hb-index" aria-label="Hobbys">
+        <nav className="hb-index" aria-label="Hobbies">
           {hobbies.map((hobby, index) => (
             <button key={hobby.id} type="button" onClick={() => jumpTo(hobby.id)}>
               <span className="fd-roles__number">{String(index + 1).padStart(2, '0')}</span>

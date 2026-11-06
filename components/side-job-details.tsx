@@ -5,38 +5,38 @@ import type { MouseEvent, ReactNode } from 'react';
 const tasks: { title: string; text: string; icon: ReactNode }[] = [
   {
     title: 'Take-away',
-    text: 'Bestellungen betreuen und die Abläufe im Take-away unterstützen.',
+    text: 'Handle orders and support takeaway operations.',
     icon: <><path d="M5 8h14l-1.2 12H6.2L5 8Z" /><path d="M9 8V6.5a3 3 0 0 1 6 0V8" /></>,
   },
   {
     title: 'Buffet',
-    text: 'Mithilfe im Buffetbetrieb, besonders an den regelmässigen Buffetabenden.',
+    text: 'Help run the buffet, especially on regular buffet evenings.',
     icon: <><path d="M3 18h18" /><path d="M5 18a7 7 0 0 1 14 0" /><path d="M12 11V8.5" /><path d="M10.5 8.5h3" /></>,
   },
   {
     title: 'Gastronomie',
-    text: 'Den laufenden Restaurantbetrieb und die praktischen Abläufe unterstützen.',
+    text: 'Support day-to-day restaurant service and operations.',
     icon: <><path d="M6 3v6a2 2 0 0 0 4 0V3" /><path d="M8 11v10" /><path d="M17 21V3c-2 1.5-3 4-3 7v3h3" /></>,
   },
   {
-    title: 'Kundenkontakt',
-    text: 'Direkte Arbeit mit Gästen und ihren Bestellungen.',
+    title: 'Guest service',
+    text: 'Work directly with guests and their orders.',
     icon: <><path d="M4 5h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-6l-4 3.5V15H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><path d="M7 9.5h6" /><path d="M7 12h3.5" /></>,
   },
   {
-    title: 'Flexibilität',
-    text: 'Zusätzlich zur Ausbildung und zum Aufbau des eigenen Unternehmens.',
+    title: 'Flexibility',
+    text: 'Balance this role with my apprenticeship and building a business.',
     icon: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.8 1.8" /></>,
   },
 ];
 
 const skills = [
-  { skill: 'Kundenorientierung', benefit: 'Bedürfnisse erkennen und auf Gäste eingehen' },
-  { skill: 'Organisation', benefit: 'Mehrere Aufgaben parallel koordinieren' },
-  { skill: 'Belastbarkeit', benefit: 'Auch in geschäftigen Phasen zuverlässig arbeiten' },
-  { skill: 'Kommunikation', benefit: 'Mit Gästen und im Team zusammenarbeiten' },
-  { skill: 'Eigenverantwortung', benefit: 'Aufgaben selbstständig übernehmen' },
-  { skill: 'Operatives Verständnis', benefit: 'Verstehen, wie ein kleiner Betrieb im Alltag funktioniert' },
+  { skill: 'Customer service', benefit: 'Recognise guests’ needs and respond thoughtfully' },
+  { skill: 'Organisation', benefit: 'Coordinate several tasks at the same time' },
+  { skill: 'Reliability under pressure', benefit: 'Stay dependable during busy periods' },
+  { skill: 'Communication', benefit: 'Work effectively with guests and the team' },
+  { skill: 'Ownership', benefit: 'Take responsibility and complete tasks independently' },
+  { skill: 'Operational insight', benefit: 'Understand how a small business runs day to day' },
 ];
 
 const followPointer = (event: MouseEvent<HTMLDivElement>) => {
@@ -56,14 +56,14 @@ export default function SideJobDetails() {
       <section className="sj-hero" onMouseMove={followPointer} onMouseLeave={resetPointer}>
         <div className="sj-hero__text">
           <p className="fd-tagline">Work · Experience · Income</p>
-          <h3 className="sj-hero__role">Mitarbeit im Familienrestaurant</h3>
+          <h3 className="sj-hero__role">Working at the family restaurant</h3>
           <p className="sj-hero__lead">
-            Neben der Ausbildung bei Swisscom und dem Aufbau von Wendico unterstütze ich das Familienrestaurant meiner Eltern: in der Gastronomie, im Take-away und am Buffet.
+            Alongside my apprenticeship at Swisscom and building Wendico, I help out at my parents’ restaurant with service, takeaway and buffet operations.
           </p>
           <dl className="fd-facts">
-            <div><dt>Betrieb</dt><dd>Reb-Thai</dd></div>
-            <div><dt>Ort</dt><dd>Andelfingen, Schweiz</dd></div>
-            <div><dt>Bereiche</dt><dd>Gastronomie · Take-away · Buffet</dd></div>
+            <div><dt>Business</dt><dd>Reb-Thai</dd></div>
+            <div><dt>Location</dt><dd>Andelfingen, Switzerland</dd></div>
+            <div><dt>Areas</dt><dd>Restaurant · Takeaway · Buffet</dd></div>
           </dl>
         </div>
         <div className="sj-hero__visual" aria-hidden="true">
@@ -75,7 +75,7 @@ export default function SideJobDetails() {
 
       <section className="details-section">
         <header className="details-section__header">
-          <p className="details-label">Aufgaben</p>
+          <p className="details-label">Responsibilities</p>
         </header>
         <ul className="sj-tasks">
           {tasks.map((task) => (
@@ -92,7 +92,7 @@ export default function SideJobDetails() {
 
       <section className="details-section">
         <header className="details-section__header">
-          <p className="details-label">Was ich dabei entwickle</p>
+          <p className="details-label">Skills I build</p>
         </header>
         <ol className="sj-skills">
           {skills.map((entry, index) => (
@@ -107,9 +107,9 @@ export default function SideJobDetails() {
       </section>
 
       <section className="fd-approach">
-        <p className="details-label">Warum es zählt</p>
+        <p className="details-label">Why it matters</p>
         <blockquote>
-          Nicht nur IT: Ich kenne den Alltag eines kleinen Unternehmens aus der <em>operativen Perspektive</em>.
+          More than technology: I understand the day-to-day of a small business from an <em>operational perspective</em>.
         </blockquote>
       </section>
     </>
