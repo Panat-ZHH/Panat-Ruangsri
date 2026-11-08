@@ -29,7 +29,7 @@ const techProfile: { area: string; items: { name: string; text: string; where: s
     { name: 'MariaDB', logo: '/logos/mariadb.png', text: 'Set up and used a relational database for web applications and projects.', where: ['Projects'] },
     { name: 'MongoDB', logo: '/logos/mongodb.png', text: 'Applied a document-oriented NoSQL database for flexible data models.', where: ['Projects'] },
   ] },
-  { area: 'Eigene Projekte', items: [
+  { area: 'Personal Projects', items: [
     { name: 'React', logo: '/logos/react.png', text: 'Learned through personal projects to build modern web interfaces.', where: ['Personal projects'] },
     { name: 'Next.js', logo: '/logos/nextjs.png', text: 'Used to build personal web applications, including this portfolio.', where: ['Personal projects', 'Portfolio'] },
     { name: 'Web apps', text: 'Planning and building modern web applications outside my apprenticeship.', where: ['Personal projects'] },
@@ -40,7 +40,7 @@ const techProfile: { area: string; items: { name: string; text: string; where: s
     { name: 'AI development', text: 'Using AI-assisted development day to day and deepening my AI expertise at ATLAS.', where: ['ATLAS'] },
     { name: 'Data & Analytics', text: 'Working on internal-user products in ATLAS’s Data, Analytics & AI division.', where: ['ATLAS'] },
   ] },
-  { area: 'Projektarbeit', items: [
+  { area: 'Project Work', items: [
     { name: 'Team leadership', text: 'Led, organised and supported an apprentice team at LOOP Operativ B2B.', where: ['LOOP Operativ B2B'] },
     { name: 'Technical leadership', text: 'Took on technical leadership for a small apprentice team at ATLAS.', where: ['ATLAS'] },
     { name: 'Stakeholder collaboration', text: 'Aligned with internal users and stakeholders of an enterprise-wide application.', where: ['ATLAS'] },
